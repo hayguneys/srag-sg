@@ -4,7 +4,7 @@ Interactive Streamlit dashboard for **Síndrome Gripal (SG)** and
 **Síndrome Respiratória Aguda Grave (SRAG)** surveillance data, with
 nowcasting and forecasting outputs from the `nowcaster` INLA model.
 
-## Structure
+## estrutura
 
 ```
 .
@@ -24,7 +24,7 @@ nowcasting and forecasting outputs from the `nowcaster` INLA model.
 └── .streamlit/config.toml
 ```
 
-## Pages
+## Páginas
 
 ### SG
 - **Tab 1 — Descritivo**
@@ -42,11 +42,11 @@ nowcasting and forecasting outputs from the `nowcaster` INLA model.
   - Histograma etário
 - **Tab 2 — Nowcasting + Forecasting** — gráfico plotly interativo
 
-### Sidebar
+### painel lateral(sidebar)
 - Date range filter (DT_DIGITA, padrão 2022–2026)
 - Age range filter (IDADE em SG, NU_IDADE_N em SRAG)
 
-## Running locally
+## Rodar localmente
 
 ```bash
 pip install -r requirements.txt
@@ -55,22 +55,9 @@ streamlit run app.py
 
 Then open <http://localhost:8501>.
 
-## Deploying to Streamlit Cloud
-
-1. Push the entire folder (including `data/` and `plots/`) to a GitHub
-   repository.
-2. Go to <https://share.streamlit.io>, click **New app**, select your
-   repo and `app.py` as the entry point.
-3. Streamlit Cloud installs `requirements.txt` automatically.
-
-The `data/*.parquet` files are committed because they are small (≪ 1 MB
-each — already trimmed to only the columns the dashboard needs). The
-`plots/*.html` files are larger (~3.7 MB each) but well under GitHub's
-100 MB limit.
-
 ## Updating the data
 
-If you generate new R output, save the dataframes to parquet from R:
+Se for feito novo output em R, salvar df em parquet no R:
 
 ```r
 arrow::write_parquet(
@@ -84,14 +71,5 @@ arrow::write_parquet(
 )
 ```
 
-Then re-export the plotly HTMLs as in your existing R scripts:
+re-exportar HTMLs como estão nos scripts do R:
 `saveWidget(p_sg_plotly, "plots/nowcasting_sg.html", selfcontained = TRUE)`.
-
-## Notes
-
-- **EVOLUCAO == 2** is the DataSUS code for "óbito por SRAG". Adjust in
-  `pages/2_SRAG.py` if your codification differs.
-- The CLASSI_FIN color palette is defined in `utils/helpers.py` for
-  consistency across the app.
-- Date filter defaults to 2022-01-01 as the lower bound per spec, even
-  though SRAG data may extend back to 2019.
