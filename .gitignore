@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+.venv/
+
+# Source / raw data files (too large for git)
+data/*.xlsx
+data/eSUS_2020_2025.parquet
+data/eSUS_2021_2022.parquet
+data/srag_main.parquet
+data/ESUS Notifica_2026.csv
+data/geocode_bairros.py
+data/DICIO_*.pdf
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,6 @@
+streamlit>=1.30
+pandas>=2.0
+pyarrow>=14.0
+plotly>=5.18
+folium>=0.14
+openpyxl>=3.1
