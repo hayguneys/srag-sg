@@ -1,8 +1,8 @@
 # SG / SRAG Surveillance Dashboard
 
-Interactive Streamlit dashboard for **Síndrome Gripal (SG)** and
-**Síndrome Respiratória Aguda Grave (SRAG)** surveillance data, with
-nowcasting and forecasting outputs from the `nowcaster` INLA model.
+Dashboard interativo feito pela equipe de dados do CIE para **Síndrome Gripal (SG)** e
+**Síndrome Respiratória Aguda Grave (SRAG)**, com
+nowcasting e forecasting usando o modelo `nowcaster` INLA .
 
 ## estrutura
 
