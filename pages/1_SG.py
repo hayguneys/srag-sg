@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from utils.helpers import (
-    load_sg, load_esus, load_esus_obitos, render_kpis, fmt_int, fmt_date_range,
+    load_sg, load_esus, load_esus_obitos, render_kpis, fmt_int,
     embed_html_plot, render_ma_chart, load_nowcast_table, paho_year_week,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS,
 )
@@ -21,6 +21,8 @@ st.title("🤧 SG — Síndrome Gripal")
 # --- Load data — filter to Recife notification municipality (COD_MUNIC) -----
 df_all = load_sg()
 df_all = df_all[df_all["COD_MUNIC"] == 261160].copy()
+
+_UNIDADES_KW_SG = ["BARROS LIMA", "ARNALDO MARQUES", "AMAURY COUTINHO", "AGAMENON", "CRAVO GAMA"]
 
 if st.session_state.pop("sg_goto_nowcasting", False):
     import streamlit.components.v1 as components
@@ -42,24 +44,38 @@ tab1, tab2, tab3, tab4 = st.tabs(["📊 Descritivo", "🧪 Testes", "📈 Nowcas
 # ============================================================
 with tab1:
 
-    # ---- 2022–2026 filter, capped at SE16/2026 ------------------------------
-    df_filt = df_all[df_all["DT_DIGITA"].dt.year.between(2022, 2026)].copy()
+    # ---- Year slider and unit filter ----------------------------------------
+    _c_year, _c_unit = st.columns([2, 2])
+    with _c_year:
+        _year_lo, _year_hi = st.slider(
+            "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="sg_desc_year",
+        )
+    with _c_unit:
+        _unit_filter = st.radio(
+            "Unidade de saúde", ["Todas", "Unidades Municipais"],
+            horizontal=True, key="sg_desc_unit",
+        )
+
+    df_filt = df_all[df_all["DT_DIGITA"].dt.year.between(_year_lo, _year_hi)].copy()
+    if _unit_filter == "Unidades Municipais":
+        _nm = df_filt["NOME_UNIDA"].str.upper().str.strip().fillna("")
+        df_filt = df_filt[_nm.apply(lambda x: any(kw in x for kw in _UNIDADES_KW_SG))].copy()
     _yr_f, _wk_f = paho_year_week(df_filt["DT_DIGITA"])
-    df_filt = df_filt[~((_yr_f == 2026) & (_wk_f > 16))]
+    if _year_hi == 2026:
+        df_filt = df_filt[~((_yr_f == 2026) & (_wk_f > 16))]
 
     # ---- KPIs --------------------------------------------------------------
     total_cases = len(df_filt)
-    date_range  = fmt_date_range(df_filt["DT_DIGITA"])
-    vac_cov     = int(df_filt["VACINA_COV"].notna().sum())   if "VACINA_COV" in df_filt.columns else 0
-    vac_flu     = int((df_filt["VACINA"] == 1).sum())        if "VACINA"     in df_filt.columns else 0
-    trat_cov    = int((df_filt["TRAT_COV"] == 1).sum())      if "TRAT_COV"   in df_filt.columns else 0
+    vac_cov  = int(df_filt["VACINA_COV"].notna().sum()) if "VACINA_COV" in df_filt.columns else 0
+    vac_flu  = int((df_filt["VACINA"] == 1).sum())      if "VACINA"     in df_filt.columns else 0
+    trat_cov = int((df_filt["TRAT_COV"] == 1).sum())   if "TRAT_COV"   in df_filt.columns else 0
 
     render_kpis([
-        ("Total de casos",            fmt_int(total_cases)),
-        ("Período (DT_DIGITA)",       date_range),
-        ("Vacinação COVID",           fmt_int(vac_cov)),
-        ("Vacinação Influenza",       fmt_int(vac_flu)),
-        ("Tratamento antiviral COVID",fmt_int(trat_cov)),
+        ("Total de casos",             fmt_int(total_cases)),
+        ("Período",                    f"{_year_lo} – {_year_hi}"),
+        ("Vacinação COVID",            fmt_int(vac_cov)),
+        ("Vacinação Influenza",        fmt_int(vac_flu)),
+        ("Tratamento antiviral COVID", fmt_int(trat_cov)),
     ])
 
     st.markdown("---")
@@ -243,6 +259,11 @@ with tab1:
             _bar_layout(fig)
             st.plotly_chart(fig, use_container_width=True)
 
+        # 0–9 anos: always Classificação Final (no toggle)
+        stacked_bar(d[(d["IDADE"] >= 0) & (d["IDADE"] <= 9)],
+                    "Classificação Final — Faixa 0–9 anos")
+
+        # 10–59 and 60+ with view toggle
         view_mode = st.radio(
             "Visualização",
             ["Classificação Final", "Sexo"],
@@ -250,14 +271,8 @@ with tab1:
             key="sg_desc_view",
         )
         render_fn = stacked_bar if view_mode == "Classificação Final" else gender_bar
+        titulo_suffix = view_mode
 
-        titulo_suffix = {
-            "Classificação Final": "Classificação Final",
-            "Sexo": "Sexo",
-        }[view_mode]
-
-        render_fn(d[(d["IDADE"] >= 0) & (d["IDADE"] <= 9)],
-                  f"{titulo_suffix} — Faixa 0–9 anos")
         render_fn(d[(d["IDADE"] >= 10) & (d["IDADE"] <= 59)],
                   f"{titulo_suffix} — Faixa 10–59 anos")
         render_fn(d[d["IDADE"] >= 60],
@@ -353,6 +368,26 @@ with tab1:
 # ============================================================
 with tab2:
 
+    # ---- Year slider and unit filter ----------------------------------------
+    _t2_cy, _t2_cu = st.columns([2, 2])
+    with _t2_cy:
+        _t2_year_lo, _t2_year_hi = st.slider(
+            "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="sg_test_year",
+        )
+    with _t2_cu:
+        _t2_unit = st.radio(
+            "Unidade de saúde", ["Todas", "Unidades Municipais"],
+            horizontal=True, key="sg_test_unit",
+        )
+
+    _df_t2 = df_all[df_all["DT_DIGITA"].dt.year.between(_t2_year_lo, _t2_year_hi)].copy()
+    if _t2_unit == "Unidades Municipais":
+        _nm_t2 = _df_t2["NOME_UNIDA"].str.upper().str.strip().fillna("")
+        _df_t2 = _df_t2[_nm_t2.apply(lambda x: any(kw in x for kw in _UNIDADES_KW_SG))].copy()
+    if _t2_year_hi == 2026:
+        _yr_t2b, _wk_t2b = paho_year_week(_df_t2["DT_DIGITA"])
+        _df_t2 = _df_t2[~((_yr_t2b == 2026) & (_wk_t2b > 16))].copy()
+
     def positividade_chart(
         source: pd.DataFrame,
         total_col: str, total_val,
@@ -438,10 +473,7 @@ with tab2:
     st.markdown("### (Sivepi-GRIPE) Total de Testes e Taxa de Positividade")
     st.caption("Soma de testes IFI e PCR Influenza realizados e taxa de positividade combinada.")
 
-    _sg_base = df_all.dropna(subset=["DT_DIGITA"]).copy()
-    _sg_base = _sg_base[_sg_base["DT_DIGITA"].dt.year.between(2022, 2026)]
-    _yr_sgb, _wk_sgb = paho_year_week(_sg_base["DT_DIGITA"])
-    _sg_base = _sg_base[~((_yr_sgb == 2026) & (_wk_sgb > 16))]
+    _sg_base = _df_t2.dropna(subset=["DT_DIGITA"]).copy()
 
     _tot_rows, _pos_rows = [], []
 
@@ -541,7 +573,7 @@ with tab2:
     st.markdown("---")
     st.markdown("### (Sivepi-GRIPE) Taxas de Positividade — IFI")
     positividade_chart(
-        df_all,
+        _df_t2,
         total_col="IFI",      total_val=1,
         pos_col="IFI_RESUL",  pos_val=1,
         bar_name="Testes IFI", bar_color="#4C78A8",
@@ -555,7 +587,7 @@ with tab2:
         horizontal=True, key="pcr_group",
     )
     positividade_chart(
-        df_all,
+        _df_t2,
         total_col="PCR_RESUL",  total_val=1,
         pos_col="POS_PCRFLU",   pos_val=1,
         bar_name="Testes PCR",  bar_color="#54A24B",
@@ -573,11 +605,12 @@ with tab2:
 
     _esus = load_esus()
 
-    # Filter to notifications made in Recife, then 2022-2026, cap at SE16/2026
+    # Filter to notifications made in Recife, apply year slider, cap at SE16/2026
     _esus = _esus[_esus["municipionotificacao"] == "Recife"].copy()
-    _esus = _esus[_esus["datanotificacao"].dt.year.between(2022, 2026)].copy()
+    _esus = _esus[_esus["datanotificacao"].dt.year.between(_t2_year_lo, _t2_year_hi)].copy()
     _yr_e, _wk_e = paho_year_week(_esus["datanotificacao"])
-    _esus = _esus[~((_yr_e == 2026) & (_wk_e > 16))]
+    if _t2_year_hi == 2026:
+        _esus = _esus[~((_yr_e == 2026) & (_wk_e > 16))]
     _esus = _esus.dropna(subset=["datanotificacao", "tipoteste"])
 
     if _esus.empty:

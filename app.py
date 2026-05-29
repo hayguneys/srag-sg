@@ -65,6 +65,7 @@ pg = st.navigation([
     st.Page(intro, title="Introdução", icon="🏠", default=True),
     st.Page("pages/1_SG.py", title="SG", icon="🤧"),
     st.Page("pages/2_SRAG.py", title="SRAG", icon="🫁"),
+    st.Page("pages/3_Resumo_Executivo.py", title="Resumo Executivo", icon="📋"),
 ])
 pg.run()
 
