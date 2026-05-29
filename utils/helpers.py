@@ -333,6 +333,41 @@ def load_nowcast_table(filename: str) -> "pd.DataFrame | None":
     return df
 
 
+# --- eSUS extended loader (for Resumo Executivo KPI cards) ---------------
+@st.cache_data(show_spinner="Carregando eSUS — KPIs…")
+def load_esus_kpi() -> pd.DataFrame:
+    """Load eSUS with state column for Brazil / PE / Recife KPI computation."""
+    path = DATA_DIR / "eSUS_all.parquet"
+    if not path.exists():
+        st.error(f"Arquivo não encontrado: {path}")
+        st.stop()
+    want = ["datanotificacao", "resultadofinal", "municipionotificacao", "estadonotificacao"]
+    try:
+        df = pd.read_parquet(path, columns=want)
+    except Exception:
+        df = pd.read_parquet(path)
+        df = df[[c for c in want if c in df.columns]]
+    df["datanotificacao"] = pd.to_datetime(df["datanotificacao"], errors="coerce")
+    return df
+
+
+@st.cache_data(show_spinner="Carregando eSUS — incidência por bairro…")
+def load_esus_incidencia() -> pd.DataFrame:
+    """Load eSUS with bairro of residence for incidence heatmap."""
+    path = DATA_DIR / "eSUS_all.parquet"
+    if not path.exists():
+        return pd.DataFrame()
+    want = ["datanotificacao", "bairro", "municipio", "municipionotificacao",
+            "estadonotificacao", "resultadofinal"]
+    try:
+        df = pd.read_parquet(path, columns=want)
+    except Exception:
+        df = pd.read_parquet(path)
+        df = df[[c for c in want if c in df.columns]]
+    df["datanotificacao"] = pd.to_datetime(df["datanotificacao"], errors="coerce")
+    return df
+
+
 # --- HTML plot embed -----------------------------------------------------
 def embed_html_plot(filename: str, height: int = 700) -> None:
     """Load a saved plotly HTML and embed it via streamlit components."""

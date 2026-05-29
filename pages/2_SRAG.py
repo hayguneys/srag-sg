@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from utils.helpers import (
-    load_srag_withna, render_kpis, fmt_int, fmt_date_range,
+    load_srag_withna, render_kpis, fmt_int,
     embed_html_plot, render_ma_chart, load_nowcast_table, paho_year_week,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, DATA_DIR,
 )
@@ -20,6 +20,8 @@ st.title("🫁 SRAG — Síndrome Respiratória Aguda Grave")
 # --- Load data — filter to Recife notification municipality (ID_MUNICIP) ----
 df_all = load_srag_withna()
 df_all = df_all[df_all["ID_MUNICIP"] == "RECIFE"].copy()
+
+_UNIDADES_KW_SRAG = ["BARROS LIMA", "ARNALDO MARQUES", "AMAURY COUTINHO", "AGAMENON"]
 
 if st.session_state.pop("srag_goto_nowcasting", False):
     import streamlit.components.v1 as components
@@ -41,20 +43,34 @@ tab1, tab2, tab3, tab4 = st.tabs(["📊 Descritivo", "🦠 Testes", "📈 Nowcas
 # ============================================================
 with tab1:
 
-    # ---- 2022–2026 filter, capped at SE16/2026 ------------------------------
-    df_filt = df_all[df_all["DT_DIGITA"].dt.year.between(2022, 2026)].copy()
+    # ---- Year slider and unit filter ----------------------------------------
+    _c_year, _c_unit = st.columns([2, 2])
+    with _c_year:
+        _year_lo, _year_hi = st.slider(
+            "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="srag_desc_year",
+        )
+    with _c_unit:
+        _unit_filter = st.radio(
+            "Unidade de internação", ["Todas", "Unidades Municipais"],
+            horizontal=True, key="srag_desc_unit",
+        )
+
+    df_filt = df_all[df_all["DT_DIGITA"].dt.year.between(_year_lo, _year_hi)].copy()
+    if _unit_filter == "Unidades Municipais" and "NM_UN_INTE" in df_filt.columns:
+        _nm = df_filt["NM_UN_INTE"].str.upper().str.strip().fillna("")
+        df_filt = df_filt[_nm.apply(lambda x: any(kw in x for kw in _UNIDADES_KW_SRAG))].copy()
     _yr_f, _wk_f = paho_year_week(df_filt["DT_DIGITA"])
-    df_filt = df_filt[~((_yr_f == 2026) & (_wk_f > 16))]
+    if _year_hi == 2026:
+        df_filt = df_filt[~((_yr_f == 2026) & (_wk_f > 16))]
 
     # ---- KPIs --------------------------------------------------------------
     total_cases  = len(df_filt)
-    date_range   = fmt_date_range(df_filt["DT_DIGITA"])
     total_deaths = int((df_filt["EVOLUCAO"] == 2).sum()) if "EVOLUCAO" in df_filt.columns else 0
 
     render_kpis([
-        ("Total de casos",      fmt_int(total_cases)),
-        ("Período (DT_DIGITA)", date_range),
-        ("Total de óbitos",     fmt_int(total_deaths)),
+        ("Total de casos",  fmt_int(total_cases)),
+        ("Período",         f"{_year_lo} – {_year_hi}"),
+        ("Total de óbitos", fmt_int(total_deaths)),
     ])
 
     st.markdown("---")
@@ -236,6 +252,11 @@ with tab1:
             _bar_layout(fig)
             st.plotly_chart(fig, use_container_width=True)
 
+        # 0–9 anos: always Classificação Final (no toggle)
+        stacked_bar(d[(d["NU_IDADE_N"] >= 0) & (d["NU_IDADE_N"] <= 9)],
+                    "Classificação Final — Faixa 0–9 anos")
+
+        # 10–59 and 60+ with view toggle
         view_mode = st.radio(
             "Visualização",
             ["Classificação Final", "Sexo"],
@@ -243,14 +264,8 @@ with tab1:
             key="srag_desc_view",
         )
         render_fn = stacked_bar if view_mode == "Classificação Final" else gender_bar
+        titulo_suffix = view_mode
 
-        titulo_suffix = {
-            "Classificação Final": "Classificação Final",
-            "Sexo": "Sexo",
-        }[view_mode]
-
-        render_fn(d[(d["NU_IDADE_N"] >= 0) & (d["NU_IDADE_N"] <= 9)],
-                  f"{titulo_suffix} — Faixa 0–9 anos")
         render_fn(d[(d["NU_IDADE_N"] >= 10) & (d["NU_IDADE_N"] <= 59)],
                   f"{titulo_suffix} — Faixa 10–59 anos")
         render_fn(d[d["NU_IDADE_N"] >= 60],
@@ -333,6 +348,18 @@ with tab1:
 # ============================================================
 with tab2:
 
+    # ---- Year slider and unit filter ----------------------------------------
+    _t2_cy, _t2_cu = st.columns([2, 2])
+    with _t2_cy:
+        _t2_year_lo, _t2_year_hi = st.slider(
+            "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="srag_test_year",
+        )
+    with _t2_cu:
+        _t2_unit = st.radio(
+            "Unidade de internação", ["Todas", "Unidades Municipais"],
+            horizontal=True, key="srag_test_unit",
+        )
+
     VIRUS_COLS = {
         "AN_PARA1": "Parainfluenza 1",
         "AN_PARA2": "Parainfluenza 2",
@@ -376,9 +403,13 @@ with tab2:
         "Rinovírus":      "#BAB0AC",
     }
 
-    _vbase = df_all[df_all["DT_DIGITA"].dt.year.between(2022, 2026)].copy()
-    _yr_vb, _wk_vb = paho_year_week(_vbase["DT_DIGITA"])
-    _vbase = _vbase[~((_yr_vb == 2026) & (_wk_vb > 16))]
+    _vbase = df_all[df_all["DT_DIGITA"].dt.year.between(_t2_year_lo, _t2_year_hi)].copy()
+    if _t2_unit == "Unidades Municipais" and "NM_UN_INTE" in _vbase.columns:
+        _nm_vb = _vbase["NM_UN_INTE"].str.upper().str.strip().fillna("")
+        _vbase = _vbase[_nm_vb.apply(lambda x: any(kw in x for kw in _UNIDADES_KW_SRAG))].copy()
+    if _t2_year_hi == 2026:
+        _yr_vb, _wk_vb = paho_year_week(_vbase["DT_DIGITA"])
+        _vbase = _vbase[~((_yr_vb == 2026) & (_wk_vb > 16))]
 
     # ---- Total de Testes (Antigeno + PCR) -----------------------------------
     st.markdown("### Total de Testes — Antígeno + PCR")
