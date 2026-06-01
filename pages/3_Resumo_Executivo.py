@@ -27,41 +27,18 @@ st.caption("Notificações 2022–2026 (todas as datas disponíveis). Testes pos
 def _compute_kpis():
     df = load_esus_kpi()
     df = df[df["datanotificacao"].dt.year.between(2022, 2026)].copy()
+    rec_df    = df[df["municipionotificacao"] == "Recife"] if "municipionotificacao" in df.columns else df
+    rec_total = len(rec_df)
+    rec_pos   = int((rec_df["resultadofinal"] == "Positivo").sum())
+    return rec_total, rec_pos
 
-    br_total   = len(df)
-    br_pos     = int((df["resultadofinal"] == "Positivo").sum())
+rec_total, rec_pos = _compute_kpis()
 
-    pe_df      = df[df["estadonotificacao"] == "Pernambuco"] if "estadonotificacao" in df.columns else pd.DataFrame()
-    pe_total   = len(pe_df)
-    pe_pos     = int((pe_df["resultadofinal"] == "Positivo").sum()) if not pe_df.empty else 0
-
-    rec_df     = df[df["municipionotificacao"] == "Recife"] if "municipionotificacao" in df.columns else pd.DataFrame()
-    rec_total  = len(rec_df)
-    rec_pos    = int((rec_df["resultadofinal"] == "Positivo").sum()) if not rec_df.empty else 0
-
-    return br_total, br_pos, pe_total, pe_pos, rec_total, rec_pos
-
-br_total, br_pos, pe_total, pe_pos, rec_total, rec_pos = _compute_kpis()
-
-_k1, _k2, _k3 = st.columns(3)
-with _k1:
-    st.markdown("#### Brasil")
-    render_kpis([
-        ("Casos notificados", fmt_int(br_total)),
-        ("Testes positivos",  fmt_int(br_pos)),
-    ])
-with _k2:
-    st.markdown("#### Pernambuco")
-    render_kpis([
-        ("Casos notificados", fmt_int(pe_total)),
-        ("Testes positivos",  fmt_int(pe_pos)),
-    ])
-with _k3:
-    st.markdown("#### Recife")
-    render_kpis([
-        ("Casos notificados", fmt_int(rec_total)),
-        ("Testes positivos",  fmt_int(rec_pos)),
-    ])
+st.markdown("#### Recife")
+render_kpis([
+    ("Casos notificados", fmt_int(rec_total)),
+    ("Testes positivos",  fmt_int(rec_pos)),
+])
 
 st.markdown("---")
 

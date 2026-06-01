@@ -370,11 +370,31 @@ def load_esus_incidencia() -> pd.DataFrame:
 
 # --- HTML plot embed -----------------------------------------------------
 def embed_html_plot(filename: str, height: int = 700) -> None:
-    """Load a saved plotly HTML and embed it via streamlit components."""
+    """Load a saved plotly HTML, inline any external *_files/ assets, and embed."""
+    import re
     import streamlit.components.v1 as components
+
     path = PLOTS_DIR / filename
     if not path.exists():
         st.warning(f"Gráfico não encontrado: {path}")
         return
+
     html = path.read_text(encoding="utf-8")
+    base_dir = path.parent
+
+    def _inline_css(m):
+        css_path = base_dir / m.group(1)
+        if css_path.exists():
+            return f"<style>{css_path.read_text(encoding='utf-8', errors='replace')}</style>"
+        return m.group(0)
+
+    def _inline_js(m):
+        js_path = base_dir / m.group(1)
+        if js_path.exists():
+            return f"<script>{js_path.read_text(encoding='utf-8', errors='replace')}</script>"
+        return m.group(0)
+
+    html = re.sub(r'<link[^>]+href="([^"]+\.css)"[^>]*/?>',  _inline_css, html)
+    html = re.sub(r'<script\s+src="([^"]+)"[^>]*></script>', _inline_js,  html)
+
     components.html(html, height=height, scrolling=True)
