@@ -22,11 +22,9 @@ def intro():
         ### Páginas disponíveis
         Use o menu lateral para navegar:
 
-        - **SG** — Síndrome Gripal
-        - **SRAG** — Síndrome Respiratória Aguda Grave
-
-        Cada página possui abas: **Descritivo**, **Taxas de Positividade** e
-        **Nowcasting + Forecasting**.
+        - **SG** — Síndrome Gripal · abas: Descritivo · Testes · Nowcasting + Forecasting · Progressão para SRAG
+        - **SRAG** — Síndrome Respiratória Aguda Grave · abas: Descritivo · Testes · Nowcasting + Forecasting · Óbitos
+        - **Resumo Executivo** — Sumário rápido das informações do painel
 
         ---
         **Sobre o nowcasting.** O modelo estima quantos casos *realmente* ocorreram
@@ -47,8 +45,8 @@ def intro():
         
     )
 
-    st.markdown("### Acesso rápido — Nowcasting + Forecasting")
-    col1, col2 = st.columns(2)
+    st.markdown("### Acesso Rápido")
+    col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("🤧 Nowcasting + Forecasting — SG", use_container_width=True):
             st.session_state["sg_goto_nowcasting"] = True
@@ -57,8 +55,46 @@ def intro():
         if st.button("🫁 Nowcasting + Forecasting — SRAG", use_container_width=True):
             st.session_state["srag_goto_nowcasting"] = True
             st.switch_page("pages/2_SRAG.py")
+    with col3:
+        if st.button("📋 Resumo Executivo", use_container_width=True):
+            st.switch_page("pages/3_Resumo_Executivo.py")
 
-    st.info("Selecione **SG** ou **SRAG** no menu à esquerda para começar.")
+    st.info("Selecione uma página no menu à esquerda para começar.")
+
+    st.markdown("---")
+    st.markdown("### Tutorial Rápido")
+
+    _vid_zoom  = Path(__file__).parent / "images" / "zoom em gráficos.mp4"
+    _vid_reset = Path(__file__).parent / "images" / "reset.mp4"
+
+    import base64
+    import streamlit.components.v1 as _c
+
+    def _gif_video(path: Path, width: str = "100%", height: int = 400):
+        if not path.exists():
+            return
+        b64 = base64.b64encode(path.read_bytes()).decode()
+        _c.html(
+            f'<video autoplay loop muted playsinline '
+            f'style="width:{width};max-width:100%;display:block;">'
+            f'<source src="data:video/mp4;base64,{b64}" type="video/mp4">'
+            f'</video>',
+            height=height,
+        )
+
+    st.markdown("**Como aplicar zoom e filtrar nos gráficos**")
+    _gif_video(_vid_zoom, width="100%", height=420)
+
+    st.markdown("**Como resetar os eixos ao estado original**")
+    if _vid_reset.exists():
+        b64r = base64.b64encode(_vid_reset.read_bytes()).decode()
+        _c.html(
+            f'<div style="display:flex;justify-content:center;">'
+            f'<video autoplay loop muted playsinline style="width:20%;max-width:100%;">'
+            f'<source src="data:video/mp4;base64,{b64r}" type="video/mp4">'
+            f'</video></div>',
+            height=350,
+        )
 
 
 pg = st.navigation([
