@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from utils.helpers import (
-    load_sg, load_esus, load_esus_obitos, render_kpis, fmt_int,
+    load_sg, load_esus, load_sg_srag_linked, render_kpis, fmt_int,
     embed_html_plot, render_ma_chart, load_nowcast_table, paho_year_week,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS,
 )
@@ -37,7 +37,7 @@ if st.session_state.pop("sg_goto_nowcasting", False):
     })();
     </script>""", height=0)
 
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Descritivo", "🧪 Testes", "📈 Nowcasting + Forecasting", "Óbitos (eSUS)"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Descritivo", "🧪 Testes", "📈 Nowcasting + Forecasting", "Progressão para SRAG"])
 
 # ============================================================
 # TAB 1 — Descriptive
@@ -736,52 +736,56 @@ with tab3:
         st.info("Dados de nowcasting não disponíveis.")
 
 # ============================================================
-# TAB 4 — Óbitos eSUS
+# TAB 4 — Progressão SG → SRAG
 # ============================================================
 with tab4:
-    st.markdown("### Óbitos — eSUS-Notifica (Recife)")
-    st.caption(
-        "Dados de pacientes com `evolucaocaso = Óbito` no eSUS-Notifica, residentes em Recife. "
-        "Informações de estabelecimento/clínica não estão disponíveis nesta base."
-    )
+    st.markdown("### Progressão para SRAG — Recife")
 
-    _ob = load_esus_obitos()
-    _ob = _ob[_ob["municipio"] == "Recife"].copy()
+    _prog = load_sg_srag_linked()
 
-    if _ob.empty:
-        st.info("Nenhum óbito encontrado.")
+    if _prog.empty:
+        st.info("Arquivo de progressão não encontrado (`data/sg_srag_linked.parquet`).")
     else:
+        # ---- Derived fields ------------------------------------------------
+        _prog = _prog.copy()
+        _prog["_sexo"]  = pd.to_numeric(_prog["sg_SEXO"], errors="coerce").map({1: "Masculino", 2: "Feminino"})
+        _prog["_idade"] = pd.to_numeric(_prog["sg_IDADE"], errors="coerce")
+
         # ---- KPIs ----------------------------------------------------------
-        _avg_age  = _ob["idade"].mean()
-        _n_fem    = (_ob["sexo"] == "Feminino").sum()
-        _n_masc   = (_ob["sexo"] == "Masculino").sum()
+        _n_fem   = (_prog["_sexo"] == "Feminino").sum()
+        _n_masc  = (_prog["_sexo"] == "Masculino").sum()
+        _avg_age = _prog["_idade"].mean()
+        _n_obito = (_prog["srag_evolucao_label"] == "Obito").sum()
+
         render_kpis([
-            ("Total de óbitos",  fmt_int(len(_ob))),
-            ("Feminino",         fmt_int(_n_fem)),
-            ("Masculino",        fmt_int(_n_masc)),
-            ("Idade média",      f"{_avg_age:.1f} anos"),
+            ("Total de progressões", fmt_int(len(_prog))),
+            ("Feminino",             fmt_int(_n_fem)),
+            ("Masculino",            fmt_int(_n_masc)),
+            ("Idade média (SG)",     f"{_avg_age:.1f} anos"),
+            ("Óbitos (SRAG)",        fmt_int(_n_obito)),
         ])
 
         st.markdown("---")
 
-        # ---- Charts row: Sexo | Faixa Etária | Bairro | Raça/Cor -----------
+        # ---- Charts row: Sexo | Faixa Etária | Bairro | Desfecho -----------
         _c1, _c2, _c3, _c4 = st.columns(4)
 
         with _c1:
-            _sex_counts = _ob["sexo"].value_counts().reset_index()
-            _sex_counts.columns = ["sexo", "n"]
-            _fig_sex = px.pie(
-                _sex_counts, names="sexo", values="n",
+            _sx = _prog["_sexo"].value_counts().reset_index()
+            _sx.columns = ["sexo", "n"]
+            _sx = _sx[_sx["sexo"].isin(["Masculino", "Feminino"])]
+            _fig_sx = px.pie(
+                _sx, names="sexo", values="n",
                 title="Por Sexo",
                 color="sexo",
-                color_discrete_map={"Feminino": "#E45756", "Masculino": "#4C78A8", "Indefinido": "#9C9C9C"},
+                color_discrete_map={"Feminino": "#E45756", "Masculino": "#4C78A8"},
                 hole=0.45,
             )
-            _fig_sex.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
-            st.plotly_chart(_fig_sex, use_container_width=True)
+            _fig_sx.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
+            st.plotly_chart(_fig_sx, use_container_width=True)
 
         with _c2:
-            _OB_SG_FAIXA_BINS = [
+            _PROG_FAIXA_BINS = [
                 ("1–4",   lambda a: (a >= 1)  & (a <= 4)),
                 ("5–9",   lambda a: (a >= 5)  & (a <= 9)),
                 ("10–19", lambda a: (a >= 10) & (a <= 19)),
@@ -791,80 +795,113 @@ with tab4:
                 ("50–59", lambda a: (a >= 50) & (a <= 59)),
                 ("60+",   lambda a: a >= 60),
             ]
-            _OB_SG_FAIXA_ORDER = [l for l, _ in _OB_SG_FAIXA_BINS]
-            _age_ob_sg = _ob.dropna(subset=["idade"]).copy()
-            for _lbl, _msk in _OB_SG_FAIXA_BINS:
-                _age_ob_sg.loc[_msk(_age_ob_sg["idade"]), "faixa"] = _lbl
-            _age_ob_sg = _age_ob_sg.dropna(subset=["faixa"])
-            _age_counts = (
-                _age_ob_sg["faixa"].value_counts()
-                .reindex(_OB_SG_FAIXA_ORDER).fillna(0).reset_index()
+            _PROG_FAIXA_ORDER = [l for l, _ in _PROG_FAIXA_BINS]
+            _age_p = _prog.dropna(subset=["_idade"]).copy()
+            for _lbl, _msk in _PROG_FAIXA_BINS:
+                _age_p.loc[_msk(_age_p["_idade"]), "faixa"] = _lbl
+            _age_p = _age_p.dropna(subset=["faixa"])
+            _age_cnt = (
+                _age_p["faixa"].value_counts()
+                .reindex(_PROG_FAIXA_ORDER).fillna(0).reset_index()
             )
-            _age_counts.columns = ["faixa", "n"]
-            _fig_age = px.bar(
-                _age_counts, x="faixa", y="n",
-                title="Por Faixa Etária",
-                labels={"faixa": "Faixa Etária", "n": "Óbitos"},
+            _age_cnt.columns = ["faixa", "n"]
+            _fig_age_p = px.bar(
+                _age_cnt, x="faixa", y="n",
+                title="Por Faixa Etária (SG)",
+                labels={"faixa": "Faixa Etária", "n": "Casos"},
                 color_discrete_sequence=["#72B7B2"],
-                category_orders={"faixa": _OB_SG_FAIXA_ORDER},
+                category_orders={"faixa": _PROG_FAIXA_ORDER},
             )
-            _fig_age.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
-            st.plotly_chart(_fig_age, use_container_width=True)
+            _fig_age_p.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
+            st.plotly_chart(_fig_age_p, use_container_width=True)
 
         with _c3:
-            _bairro_counts = (
-                _ob["bairro"].value_counts().head(10).reset_index()
+            _bairro_p = (
+                _prog["sg_NOM_BAIRRO"].str.title()
+                .value_counts().head(10).reset_index()
             )
-            _bairro_counts.columns = ["bairro", "n"]
-            _fig_bairro = px.bar(
-                _bairro_counts, x="n", y="bairro",
+            _bairro_p.columns = ["bairro", "n"]
+            _fig_bairro_p = px.bar(
+                _bairro_p, x="n", y="bairro",
                 orientation="h",
                 title="Por Bairro (top 10)",
-                labels={"bairro": "", "n": "Óbitos"},
+                labels={"bairro": "", "n": "Casos"},
                 color_discrete_sequence=["#F58518"],
             )
-            _fig_bairro.update_layout(
+            _fig_bairro_p.update_layout(
                 yaxis=dict(autorange="reversed"),
                 margin=dict(l=10, r=10, t=50, b=10),
                 height=320,
             )
-            st.plotly_chart(_fig_bairro, use_container_width=True)
+            st.plotly_chart(_fig_bairro_p, use_container_width=True)
 
         with _c4:
-            _raca_counts = _ob["racacor"].value_counts().reset_index()
-            _raca_counts.columns = ["racacor", "n"]
-            _fig_raca = px.bar(
-                _raca_counts, x="n", y="racacor",
-                orientation="h",
-                title="Por Raça/Cor",
-                labels={"racacor": "", "n": "Óbitos"},
-                color_discrete_sequence=["#B279A2"],
+            _ev = _prog["srag_evolucao_label"].fillna("Sem registro").value_counts().reset_index()
+            _ev.columns = ["evolucao", "n"]
+            _fig_ev = px.pie(
+                _ev, names="evolucao", values="n",
+                title="Desfecho (SRAG)",
+                hole=0.45,
+                color_discrete_map={
+                    "Cura": "#54A24B", "Obito": "#E45756",
+                    "Obito por outras causas": "#F58518",
+                    "Ignorado": "#9C9C9C", "Sem registro": "#CCCCCC",
+                },
             )
-            _fig_raca.update_layout(
-                yaxis=dict(autorange="reversed"),
-                margin=dict(l=10, r=10, t=50, b=10),
-                height=320,
-            )
-            st.plotly_chart(_fig_raca, use_container_width=True)
+            _fig_ev.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
+            st.plotly_chart(_fig_ev, use_container_width=True)
+
+        st.markdown("---")
+
+        # ---- Gap distribution bar chart ------------------------------------
+        st.markdown("#### Intervalo entre notificação SG e SRAG")
+        _gap_order = ["0-7d", "8-14d", "15-30d", "31-60d", "61-90d", "91-180d", "181-365d", ">365d"]
+        _gap_cnt = (
+            _prog["gap_faixa"].value_counts()
+            .reindex(_gap_order).fillna(0).reset_index()
+        )
+        _gap_cnt.columns = ["intervalo", "n"]
+        _fig_gap = px.bar(
+            _gap_cnt, x="intervalo", y="n",
+            title="Dias entre notificação SG e SRAG",
+            labels={"intervalo": "Intervalo", "n": "Casos"},
+            color_discrete_sequence=["#B279A2"],
+            category_orders={"intervalo": _gap_order},
+        )
+        _fig_gap.update_layout(
+            margin=dict(l=20, r=20, t=50, b=60),
+            height=340,
+            plot_bgcolor="white",
+        )
+        st.plotly_chart(_fig_gap, use_container_width=True)
 
         st.markdown("---")
 
         # ---- Detailed table ------------------------------------------------
-        st.markdown("#### Tabela de Óbitos")
-        _tbl_ob = _ob[[
-            "datanotificacao", "sexo", "idade", "racacor",
-            "bairro", "sintomas", "tipoteste", "resultadofinal", "classificacaofinal",
-        ]].copy()
-        _tbl_ob["datanotificacao"] = _tbl_ob["datanotificacao"].dt.strftime("%d/%m/%Y")
-        _tbl_ob = _tbl_ob.rename(columns={
-            "datanotificacao":   "Data Notificação",
-            "sexo":              "Sexo",
-            "idade":             "Idade",
-            "racacor":           "Raça/Cor",
-            "bairro":            "Bairro",
-            "sintomas":          "Sintomas",
-            "tipoteste":         "Tipo de Teste",
-            "resultadofinal":    "Resultado Final",
-            "classificacaofinal":"Classificação Final",
+        st.markdown("#### Tabela de Casos")
+        _tbl_p = _prog[[c for c in [
+            "sg_DT_DIGITA", "srag_DT_DIGITA", "gap_dias",
+            "_sexo", "_idade", "sg_NOM_BAIRRO",
+            "sg_classi_label", "srag_classi_label",
+            "srag_evolucao_label", "srag_NM_UN_INTE",
+        ] if c in _prog.columns]].copy()
+        _tbl_p = _tbl_p.rename(columns={
+            "sg_DT_DIGITA":        "Data SG",
+            "srag_DT_DIGITA":      "Data SRAG",
+            "gap_dias":            "Intervalo (dias)",
+            "_sexo":               "Sexo",
+            "_idade":              "Idade (SG)",
+            "sg_NOM_BAIRRO":       "Bairro",
+            "sg_classi_label":     "Classificação SG",
+            "srag_classi_label":   "Classificação SRAG",
+            "srag_evolucao_label": "Desfecho SRAG",
+            "srag_NM_UN_INTE":     "Hospital (SRAG)",
         })
-        st.dataframe(_tbl_ob, use_container_width=True, hide_index=True)
+        for _dc in ["Data SG", "Data SRAG"]:
+            if _dc in _tbl_p.columns:
+                _tbl_p[_dc] = pd.to_datetime(_tbl_p[_dc], errors="coerce").dt.strftime("%d/%m/%Y")
+        if "Bairro" in _tbl_p.columns:
+            _tbl_p["Bairro"] = _tbl_p["Bairro"].str.title()
+        if "Hospital (SRAG)" in _tbl_p.columns:
+            _tbl_p["Hospital (SRAG)"] = _tbl_p["Hospital (SRAG)"].str.title()
+        st.dataframe(_tbl_p, use_container_width=True, hide_index=True)
