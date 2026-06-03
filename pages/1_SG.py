@@ -9,9 +9,9 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from utils.helpers import (
-    load_sg, load_esus, load_sg_srag_linked, load_bairro_distrito,
-    render_kpis, fmt_int,
+    load_sg, load_esus, load_esus_obitos, render_kpis, fmt_int,
     embed_html_plot, render_ma_chart, load_nowcast_table, paho_year_week,
+    CLASSI_FIN_LABELS, CLASSI_FIN_COLORS,
 )
 
 
@@ -23,10 +23,6 @@ df_all = load_sg()
 df_all = df_all[df_all["COD_MUNIC"] == 261160].copy()
 
 _UNIDADES_KW_SG = ["BARROS LIMA", "ARNALDO MARQUES", "AMAURY COUTINHO", "AGAMENON", "CRAVO GAMA"]
-
-_FONTE_SG   = "BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndrome Gripal. Brasília, 2026."
-_FONTE_ESUS = "BRASIL. Ministério da Saúde. eSUS-Notifica. Brasília, 2026."
-_FONTE_PROG = "BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndrome Gripal e Síndromes Respiratórias Agudas Graves. Brasília, 2026."
 
 if st.session_state.pop("sg_goto_nowcasting", False):
     import streamlit.components.v1 as components
@@ -41,7 +37,7 @@ if st.session_state.pop("sg_goto_nowcasting", False):
     })();
     </script>""", height=0)
 
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Descritivo", "🧪 Testes", "📈 Nowcasting + Forecasting", "Progressão para SRAG"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Descritivo", "🧪 Testes", "📈 Nowcasting + Forecasting", "Óbitos (eSUS)"])
 
 # ============================================================
 # TAB 1 — Descriptive
@@ -109,7 +105,9 @@ with tab1:
                 "<extra></extra>"
             )
 
-    # shared colour maps
+    # ---- Faixa Etária — all cases ----------------------------------------
+    st.markdown("#### Casos por Faixa Etária")
+
     FAIXA_BINS = [
         ("1–4",   lambda a: (a >= 1)  & (a <= 4)),
         ("5–9",   lambda a: (a >= 5)  & (a <= 9)),
@@ -121,101 +119,164 @@ with tab1:
         ("60+",   lambda a: a >= 60),
     ]
     FAIXA_COLORS = {
-        "1–4": "#4C78A8", "5–9": "#F58518", "10–19": "#E45756",
-        "20–29": "#72B7B2", "30–39": "#54A24B", "40–49": "#EECA3B",
-        "50–59": "#B279A2", "60+": "#FF9DA6",
+        "1–4":   "#4C78A8",
+        "5–9":   "#F58518",
+        "10–19": "#E45756",
+        "20–29": "#72B7B2",
+        "30–39": "#54A24B",
+        "40–49": "#EECA3B",
+        "50–59": "#B279A2",
+        "60+":   "#FF9DA6",
     }
-    RACA_LABELS = {1: "Branca", 2: "Preta", 3: "Amarela", 4: "Parda", 5: "Indígena", 9: "Ignorado"}
-    RACA_COLORS = {
-        "Branca": "#4C78A8", "Parda": "#F58518", "Preta": "#E45756",
-        "Amarela": "#EECA3B", "Indígena": "#54A24B", "Ignorado": "#9C9C9C",
-    }
-    DISTRITO_COLORS = {
-        "DS I":   "#4C78A8", "DS II":  "#F58518",
-        "DS III": "#E45756", "DS IV":  "#72B7B2",
-        "DS V":   "#54A24B", "DS VI":  "#EECA3B",
-        "DS VII": "#B279A2", "DS VIII":"#FF9DA6",
-        "Não mapeado": "#CCCCCC",
-    }
-    DISTRITO_ORDER = [
-        "DS I", "DS II", "DS III", "DS IV",
-        "DS V", "DS VI", "DS VII", "DS VIII",
-        "Não mapeado",
-    ]
 
-    def _wsb(df_in, col, color_map, title, col_order=None, fonte=None):
-        """Weekly stacked bar helper."""
-        _d = df_in.dropna(subset=["DT_DIGITA", col]).copy()
-        if _d.empty:
-            st.info(f"Sem dados para {title}.")
-            return
-        _yr, _wk = paho_year_week(_d["DT_DIGITA"])
-        _d["semana"]      = "SE " + _wk.astype(str).str.zfill(2) + "/" + _yr.astype(str)
-        _d["semana_sort"] = _yr * 100 + _wk
-        _agg = _d.groupby(["semana", "semana_sort", col]).size().reset_index(name="n")
-        _ord = _agg[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
-        _cat = {"semana": _ord}
-        if col_order:
-            _cat[col] = col_order
-        _fig = px.bar(
-            _agg, x="semana", y="n", color=col,
-            color_discrete_map=color_map,
-            title=title,
-            labels={"semana": "Semana Epidemiológica", "n": "Nº Casos", col: col},
-            category_orders=_cat,
-        )
-        _add_pct_hover(_fig, _agg)
-        _bar_layout(_fig)
-        st.plotly_chart(_fig, use_container_width=True)
-        if fonte:
-            st.caption(f"Fonte: {fonte}")
+    _faixa_view = st.radio(
+        "Visualização", ["Faixa Etária", "Sexo"],
+        horizontal=True, key="sg_faixa_view",
+    )
 
-    # ---- 1. Casos por Faixa Etária ----------------------------------------
-    st.markdown("#### Casos por Faixa Etária")
     _age = df_filt.copy()
     _age["IDADE"] = pd.to_numeric(_age["IDADE"], errors="coerce")
     _age = _age.dropna(subset=["DT_DIGITA", "IDADE"])
-    for _lbl, _msk in FAIXA_BINS:
-        _age.loc[_msk(_age["IDADE"]), "faixa"] = _lbl
+    for _label, _mask in FAIXA_BINS:
+        _age.loc[_mask(_age["IDADE"]), "faixa"] = _label
     _age = _age.dropna(subset=["faixa"])
-    _wsb(_age, "faixa", FAIXA_COLORS,
-         "Casos por Faixa Etária por Semana Epidemiológica",
-         col_order=[l for l, _ in FAIXA_BINS], fonte=_FONTE_SG)
+
+    if _age.empty:
+        st.info("Sem dados de faixa etária.")
+    elif _faixa_view == "Faixa Etária":
+        _yr_a, _wk_a = paho_year_week(_age["DT_DIGITA"])
+        _age["semana"]      = "SE " + _wk_a.astype(str).str.zfill(2) + "/" + _yr_a.astype(str)
+        _age["semana_sort"] = _yr_a * 100 + _wk_a
+        _agg_a = _age.groupby(["semana", "semana_sort", "faixa"]).size().reset_index(name="n")
+        _ord_a = _agg_a[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
+        _fig_a = px.bar(
+            _agg_a, x="semana", y="n", color="faixa",
+            color_discrete_map=FAIXA_COLORS,
+            title="Casos por Faixa Etária por Semana Epidemiológica",
+            labels={"semana": "Semana Epidemiológica", "n": "Nº Casos", "faixa": "Faixa Etária"},
+            category_orders={"semana": _ord_a, "faixa": [l for l, _ in FAIXA_BINS]},
+        )
+        _add_pct_hover(_fig_a, _agg_a)
+        _bar_layout(_fig_a)
+        st.plotly_chart(_fig_a, use_container_width=True)
+    else:
+        _sx = _age.copy()
+        _sx["SEXO"] = pd.to_numeric(_sx["SEXO"], errors="coerce")
+        _sx = _sx[_sx["SEXO"].isin([1, 2])]
+        _sx["SEXO_LABEL"] = _sx["SEXO"].astype(int).map({1: "Masculino", 2: "Feminino"})
+        if _sx.empty:
+            st.info("Sem dados de sexo.")
+        else:
+            _yr_sx, _wk_sx = paho_year_week(_sx["DT_DIGITA"])
+            _sx["semana"]      = "SE " + _wk_sx.astype(str).str.zfill(2) + "/" + _yr_sx.astype(str)
+            _sx["semana_sort"] = _yr_sx * 100 + _wk_sx
+            _agg_sx = _sx.groupby(["semana", "semana_sort", "SEXO_LABEL"]).size().reset_index(name="n")
+            _ord_sx = _agg_sx[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
+            _fig_sx = px.bar(
+                _agg_sx, x="semana", y="n", color="SEXO_LABEL",
+                color_discrete_map={"Masculino": "#4C78A8", "Feminino": "#E45756"},
+                title="Casos por Sexo por Semana Epidemiológica",
+                labels={"semana": "Semana Epidemiológica", "n": "Nº Casos", "SEXO_LABEL": "Sexo"},
+                category_orders={"semana": _ord_sx},
+            )
+            _add_pct_hover(_fig_sx, _agg_sx)
+            _bar_layout(_fig_sx)
+            st.plotly_chart(_fig_sx, use_container_width=True)
 
     st.markdown("---")
 
-    # ---- 2. Casos por Raça/Cor --------------------------------------------
-    st.markdown("#### Casos por Raça/Cor")
-    _raca = df_filt.copy()
-    _raca["raca_lbl"] = pd.to_numeric(_raca["RACA"], errors="coerce").map(RACA_LABELS)
-    _wsb(_raca, "raca_lbl", RACA_COLORS,
-         "Casos por Raça/Cor por Semana Epidemiológica",
-         col_order=list(RACA_COLORS.keys()), fonte=_FONTE_SG)
+    if "CLASSI_FIN" not in df_filt.columns:
+        st.warning("Coluna CLASSI_FIN não encontrada.")
+    else:
+        d = df_filt.copy()
+        d["IDADE"]      = pd.to_numeric(d["IDADE"], errors="coerce")
+        d["CLASSI_FIN"] = pd.to_numeric(d["CLASSI_FIN"], errors="coerce")
+        d = d.dropna(subset=["DT_DIGITA", "IDADE", "CLASSI_FIN"])
+        d["CLASSI_LABEL"] = d["CLASSI_FIN"].astype(int).map(CLASSI_FIN_LABELS)
+        d = d.dropna(subset=["CLASSI_LABEL"])
 
-    st.markdown("---")
+        _epi_yr, _epi_wk = paho_year_week(d["DT_DIGITA"])
+        d["semana"]      = "SE " + _epi_wk.astype(str).str.zfill(2) + "/" + _epi_yr.astype(str)
+        d["semana_sort"] = _epi_yr * 100 + _epi_wk
 
-    # ---- 3. Casos por Sexo ------------------------------------------------
-    st.markdown("#### Casos por Sexo")
-    _sexo = df_filt.copy()
-    _sexo["sexo_lbl"] = pd.to_numeric(_sexo["SEXO"], errors="coerce").map({1: "Masculino", 2: "Feminino"})
-    _wsb(_sexo, "sexo_lbl", {"Masculino": "#4C78A8", "Feminino": "#E45756"},
-         "Casos por Sexo por Semana Epidemiológica",
-         col_order=["Masculino", "Feminino"], fonte=_FONTE_SG)
+        SEXO_LABELS = {1: "Masculino", 2: "Feminino"}
+        SEXO_COLORS = {"Masculino": "#4C78A8", "Feminino": "#E45756"}
 
-    st.markdown("---")
+        def stacked_bar(sub: pd.DataFrame, titulo: str):
+            if sub.empty:
+                st.info(f"Sem dados para {titulo}.")
+                return
+            agg = (sub.groupby(["semana", "semana_sort", "CLASSI_LABEL"])
+                      .size().reset_index(name="n"))
+            semana_order = (
+                agg[["semana", "semana_sort"]]
+                .drop_duplicates()
+                .sort_values("semana_sort")["semana"]
+                .tolist()
+            )
+            fig = px.bar(
+                agg, x="semana", y="n", color="CLASSI_LABEL",
+                color_discrete_map=CLASSI_FIN_COLORS,
+                title=titulo,
+                labels={"semana": "Semana Epidemiológica",
+                        "n": "Nº Casos",
+                        "CLASSI_LABEL": "Classificação"},
+                category_orders={"semana": semana_order},
+            )
+            _add_pct_hover(fig, agg)
+            _bar_layout(fig)
+            st.plotly_chart(fig, use_container_width=True)
 
-    # ---- 4. Casos por Distrito Sanitário ----------------------------------
-    st.markdown("#### Casos por Distrito Sanitário")
-    _bairro_ds = load_bairro_distrito()
-    _dist = df_filt.copy()
-    _dist["_bairro_up"] = _dist["NOM_BAIRRO"].str.upper().str.strip().fillna("")
-    _dist = _dist.merge(_bairro_ds.rename(columns={"bairro": "_bairro_up"}),
-                        on="_bairro_up", how="left")
-    _dist["distrito"] = _dist["distrito"].fillna("Não mapeado")
-    _dist = _dist[_dist["distrito"] != "Não mapeado"]
-    _wsb(_dist, "distrito", DISTRITO_COLORS,
-         "Casos por Distrito Sanitário por Semana Epidemiológica",
-         col_order=[d for d in DISTRITO_ORDER if d != "Não mapeado"], fonte=_FONTE_SG)
+        def gender_bar(sub: pd.DataFrame, titulo: str):
+            if sub.empty:
+                st.info(f"Sem dados para {titulo}.")
+                return
+            g = sub.copy()
+            g["SEXO"] = pd.to_numeric(g["SEXO"], errors="coerce")
+            g = g[g["SEXO"].isin([1, 2])]
+            g["SEXO_LABEL"] = g["SEXO"].astype(int).map(SEXO_LABELS)
+            if g.empty:
+                st.info(f"Sem dados de sexo para {titulo}.")
+                return
+            agg = (g.groupby(["semana", "semana_sort", "SEXO_LABEL"])
+                     .size().reset_index(name="n"))
+            semana_order = (
+                agg[["semana", "semana_sort"]]
+                .drop_duplicates()
+                .sort_values("semana_sort")["semana"]
+                .tolist()
+            )
+            fig = px.bar(
+                agg, x="semana", y="n", color="SEXO_LABEL",
+                color_discrete_map=SEXO_COLORS,
+                title=titulo,
+                labels={"semana": "Semana Epidemiológica",
+                        "n": "Nº Casos",
+                        "SEXO_LABEL": "Sexo"},
+                category_orders={"semana": semana_order},
+            )
+            _add_pct_hover(fig, agg)
+            _bar_layout(fig)
+            st.plotly_chart(fig, use_container_width=True)
+
+        # 0–9 anos: always Classificação Final (no toggle)
+        stacked_bar(d[(d["IDADE"] >= 0) & (d["IDADE"] <= 9)],
+                    "Classificação Final — Faixa 0–9 anos")
+
+        # 10–59 and 60+ with view toggle
+        view_mode = st.radio(
+            "Visualização",
+            ["Classificação Final", "Sexo"],
+            horizontal=True,
+            key="sg_desc_view",
+        )
+        render_fn = stacked_bar if view_mode == "Classificação Final" else gender_bar
+        titulo_suffix = view_mode
+
+        render_fn(d[(d["IDADE"] >= 10) & (d["IDADE"] <= 59)],
+                  f"{titulo_suffix} — Faixa 10–59 anos")
+        render_fn(d[d["IDADE"] >= 60],
+                  f"{titulo_suffix} — Faixa 60+ anos")
 
     # ---- FIN_FLU — Influenza type ----------------------------------------------
     st.markdown("---")
@@ -252,7 +313,6 @@ with tab1:
             _add_pct_hover(_fig_f, _agg_f)
             _bar_layout(_fig_f)
             st.plotly_chart(_fig_f, use_container_width=True)
-            st.caption("Fonte: BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndrome Gripal. Brasília, 2026.")
 
     # ---- FIN_SUBT — Influenza subtypes -----------------------------------------
     st.markdown("---")
@@ -301,7 +361,6 @@ with tab1:
             _add_pct_hover(_fig_s, _agg_s)
             _bar_layout(_fig_s)
             st.plotly_chart(_fig_s, use_container_width=True)
-            st.caption("Fonte: BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndrome Gripal. Brasília, 2026.")
 
 
 # ============================================================
@@ -410,8 +469,8 @@ with tab2:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    # ---- (SIVEP-GRIPE) Total (IFI + PCR) ----------------------------------------
-    st.markdown("### (SIVEP-GRIPE) Total de Testes e Taxa de Positividade")
+    # ---- (Sivepi-GRIPE) Total (IFI + PCR) ----------------------------------------
+    st.markdown("### (Sivepi-GRIPE) Total de Testes e Taxa de Positividade")
     st.caption("Soma de testes IFI e PCR Influenza realizados e taxa de positividade combinada.")
 
     _sg_base = _df_t2.dropna(subset=["DT_DIGITA"]).copy()
@@ -487,7 +546,7 @@ with tab2:
             ),
         ))
         _fig_tot_sg.update_layout(
-            title="(SIVEP-GRIPE) Total de Testes Realizados (IFI + PCR) e Taxa de Positividade",
+            title="(Sivepi-GRIPE) Total de Testes Realizados (IFI + PCR) e Taxa de Positividade",
             xaxis=dict(
                 title="Semana Epidemiológica",
                 tickangle=-90,
@@ -510,21 +569,19 @@ with tab2:
             plot_bgcolor="white",
         )
         st.plotly_chart(_fig_tot_sg, use_container_width=True)
-        st.caption(f"Fonte: {_FONTE_SG}")
 
     st.markdown("---")
-    st.markdown("### (Sivep-GRIPE) Taxas de Positividade — IFI")
+    st.markdown("### (Sivepi-GRIPE) Taxas de Positividade — IFI")
     positividade_chart(
         _df_t2,
         total_col="IFI",      total_val=1,
         pos_col="IFI_RESUL",  pos_val=1,
         bar_name="Testes IFI", bar_color="#4C78A8",
-        titulo="(SIVEP-GRIPE) Testes IFI e Taxa de Positividade por Semana Epidemiológica",
+        titulo="(Sivepi-GRIPE) Testes IFI e Taxa de Positividade por Semana Epidemiológica",
     )
-    st.caption(f"Fonte: {_FONTE_SG}")
 
     st.markdown("---")
-    st.markdown("### (SIVEP-GRIPE) Taxas de Positividade — PCR Influenza")
+    st.markdown("### (Sivepi-GRIPE) Taxas de Positividade — PCR Influenza")
     pcr_view = st.radio(
         "Agrupamento", ["Semanal", "4 Semanas"],
         horizontal=True, key="pcr_group",
@@ -534,10 +591,9 @@ with tab2:
         total_col="PCR_RESUL",  total_val=1,
         pos_col="POS_PCRFLU",   pos_val=1,
         bar_name="Testes PCR",  bar_color="#54A24B",
-        titulo="(SIVEP-GRIPE) Testes PCR e Taxa de Positividade para Influenza por Semana Epidemiológica",
+        titulo="(Sivepi-GRIPE) Testes PCR e Taxa de Positividade para Influenza por Semana Epidemiológica",
         group_weeks=4 if pcr_view == "4 Semanas" else 1,
     )
-    st.caption(f"Fonte: {_FONTE_SG}")
 
     # ------------------------------------------------------------------ eSUS
     st.markdown("---")
@@ -652,7 +708,6 @@ with tab2:
             plot_bgcolor="white",
         )
         st.plotly_chart(_fig_e, use_container_width=True)
-        st.caption(f"Fonte: {_FONTE_ESUS}")
 
 # ============================================================
 # TAB 3 — Nowcasting + Forecasting
@@ -661,15 +716,14 @@ with tab3:
     st.markdown("### Nowcasting + Forecasting — SG (R / INLA)")
     st.caption(
         "Modelo INLA estruturado por idade (`bins_age = '10 years'`), "
-        "`wdw = 230` semanas, `K = 4` semanas de forecast."
+        "`wdw = 230` semanas, `K = 8` semanas de forecast."
     )
     embed_html_plot("nowcasting_sg.html", height=750)
-    st.caption(f"Fonte: {_FONTE_SG}")
 
     st.markdown("---")
     st.markdown("### Média Móvel — Semanas Epidemiológicas 2026")
     st.caption("Média móvel de 4 semanas sobre casos semanais por semana de início dos sintomas (`DT_PRISINT`).")
-    render_ma_chart(df_all, onset_col="DT_PRISINT", titulo="Média Móvel 4 sem. — SG (ILI)", fonte=_FONTE_SG)
+    render_ma_chart(df_all, onset_col="DT_PRISINT", titulo="Média Móvel 4 sem. — SG (ILI)")
 
     st.markdown("---")
     st.markdown("###Semanas previstas")
@@ -682,57 +736,52 @@ with tab3:
         st.info("Dados de nowcasting não disponíveis.")
 
 # ============================================================
-# TAB 4 — Progressão SG → SRAG
+# TAB 4 — Óbitos eSUS
 # ============================================================
 with tab4:
-    st.markdown("### Progressão para SRAG — Recife")
+    st.markdown("### Óbitos — eSUS-Notifica (Recife)")
+    st.caption(
+        "Dados de pacientes com `evolucaocaso = Óbito` no eSUS-Notifica, residentes em Recife. "
+        "Informações de estabelecimento/clínica não estão disponíveis nesta base."
+    )
 
-    _prog = load_sg_srag_linked()
+    _ob = load_esus_obitos()
+    _ob = _ob[_ob["municipio"] == "Recife"].copy()
 
-    if _prog.empty:
-        st.info("Arquivo de progressão não encontrado (`data/sg_srag_linked.parquet`).")
+    if _ob.empty:
+        st.info("Nenhum óbito encontrado.")
     else:
-        # ---- Derived fields ------------------------------------------------
-        _prog = _prog.copy()
-        _prog["_sexo"]  = pd.to_numeric(_prog["sg_SEXO"], errors="coerce").map({1: "Masculino", 2: "Feminino"})
-        _prog["_idade"] = pd.to_numeric(_prog["sg_IDADE"], errors="coerce")
-
         # ---- KPIs ----------------------------------------------------------
-        _n_fem   = (_prog["_sexo"] == "Feminino").sum()
-        _n_masc  = (_prog["_sexo"] == "Masculino").sum()
-        _avg_age = _prog["_idade"].mean()
-        _n_obito = (_prog["srag_evolucao_label"] == "Obito").sum()
-
+        _avg_age  = _ob["idade"].mean()
+        _n_fem    = (_ob["sexo"] == "Feminino").sum()
+        _n_masc   = (_ob["sexo"] == "Masculino").sum()
         render_kpis([
-            ("Total de progressões", fmt_int(len(_prog))),
-            ("Feminino",             fmt_int(_n_fem)),
-            ("Masculino",            fmt_int(_n_masc)),
-            ("Idade média (SG)",     f"{_avg_age:.1f} anos"),
-            ("Óbitos (SRAG)",        fmt_int(_n_obito)),
+            ("Total de óbitos",  fmt_int(len(_ob))),
+            ("Feminino",         fmt_int(_n_fem)),
+            ("Masculino",        fmt_int(_n_masc)),
+            ("Idade média",      f"{_avg_age:.1f} anos"),
         ])
 
         st.markdown("---")
 
-        # ---- Charts row: Sexo | Faixa Etária | Bairro | Desfecho -----------
+        # ---- Charts row: Sexo | Faixa Etária | Bairro | Raça/Cor -----------
         _c1, _c2, _c3, _c4 = st.columns(4)
 
         with _c1:
-            _sx = _prog["_sexo"].value_counts().reset_index()
-            _sx.columns = ["sexo", "n"]
-            _sx = _sx[_sx["sexo"].isin(["Masculino", "Feminino"])]
-            _fig_sx = px.pie(
-                _sx, names="sexo", values="n",
+            _sex_counts = _ob["sexo"].value_counts().reset_index()
+            _sex_counts.columns = ["sexo", "n"]
+            _fig_sex = px.pie(
+                _sex_counts, names="sexo", values="n",
                 title="Por Sexo",
                 color="sexo",
-                color_discrete_map={"Feminino": "#E45756", "Masculino": "#4C78A8"},
+                color_discrete_map={"Feminino": "#E45756", "Masculino": "#4C78A8", "Indefinido": "#9C9C9C"},
                 hole=0.45,
             )
-            _fig_sx.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
-            st.plotly_chart(_fig_sx, use_container_width=True)
-            st.caption(f"Fonte: {_FONTE_PROG}")
+            _fig_sex.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
+            st.plotly_chart(_fig_sex, use_container_width=True)
 
         with _c2:
-            _PROG_FAIXA_BINS = [
+            _OB_SG_FAIXA_BINS = [
                 ("1–4",   lambda a: (a >= 1)  & (a <= 4)),
                 ("5–9",   lambda a: (a >= 5)  & (a <= 9)),
                 ("10–19", lambda a: (a >= 10) & (a <= 19)),
@@ -742,193 +791,80 @@ with tab4:
                 ("50–59", lambda a: (a >= 50) & (a <= 59)),
                 ("60+",   lambda a: a >= 60),
             ]
-            _PROG_FAIXA_ORDER = [l for l, _ in _PROG_FAIXA_BINS]
-            _age_p = _prog.dropna(subset=["_idade"]).copy()
-            for _lbl, _msk in _PROG_FAIXA_BINS:
-                _age_p.loc[_msk(_age_p["_idade"]), "faixa"] = _lbl
-            _age_p = _age_p.dropna(subset=["faixa"])
-            _age_cnt = (
-                _age_p["faixa"].value_counts()
-                .reindex(_PROG_FAIXA_ORDER).fillna(0).reset_index()
+            _OB_SG_FAIXA_ORDER = [l for l, _ in _OB_SG_FAIXA_BINS]
+            _age_ob_sg = _ob.dropna(subset=["idade"]).copy()
+            for _lbl, _msk in _OB_SG_FAIXA_BINS:
+                _age_ob_sg.loc[_msk(_age_ob_sg["idade"]), "faixa"] = _lbl
+            _age_ob_sg = _age_ob_sg.dropna(subset=["faixa"])
+            _age_counts = (
+                _age_ob_sg["faixa"].value_counts()
+                .reindex(_OB_SG_FAIXA_ORDER).fillna(0).reset_index()
             )
-            _age_cnt.columns = ["faixa", "n"]
-            _fig_age_p = px.bar(
-                _age_cnt, x="faixa", y="n",
-                title="Por Faixa Etária (SG)",
-                labels={"faixa": "Faixa Etária", "n": "Casos"},
+            _age_counts.columns = ["faixa", "n"]
+            _fig_age = px.bar(
+                _age_counts, x="faixa", y="n",
+                title="Por Faixa Etária",
+                labels={"faixa": "Faixa Etária", "n": "Óbitos"},
                 color_discrete_sequence=["#72B7B2"],
-                category_orders={"faixa": _PROG_FAIXA_ORDER},
+                category_orders={"faixa": _OB_SG_FAIXA_ORDER},
             )
-            _fig_age_p.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
-            st.plotly_chart(_fig_age_p, use_container_width=True)
-            st.caption(f"Fonte: {_FONTE_PROG}")
+            _fig_age.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
+            st.plotly_chart(_fig_age, use_container_width=True)
 
         with _c3:
-            _bairro_p = (
-                _prog["sg_NOM_BAIRRO"].str.title()
-                .value_counts().head(10).reset_index()
+            _bairro_counts = (
+                _ob["bairro"].value_counts().head(10).reset_index()
             )
-            _bairro_p.columns = ["bairro", "n"]
-            _fig_bairro_p = px.bar(
-                _bairro_p, x="n", y="bairro",
+            _bairro_counts.columns = ["bairro", "n"]
+            _fig_bairro = px.bar(
+                _bairro_counts, x="n", y="bairro",
                 orientation="h",
                 title="Por Bairro (top 10)",
-                labels={"bairro": "", "n": "Casos"},
+                labels={"bairro": "", "n": "Óbitos"},
                 color_discrete_sequence=["#F58518"],
             )
-            _fig_bairro_p.update_layout(
+            _fig_bairro.update_layout(
                 yaxis=dict(autorange="reversed"),
                 margin=dict(l=10, r=10, t=50, b=10),
                 height=320,
             )
-            st.plotly_chart(_fig_bairro_p, use_container_width=True)
-            st.caption(f"Fonte: {_FONTE_PROG}")
+            st.plotly_chart(_fig_bairro, use_container_width=True)
 
         with _c4:
-            _ev = _prog["srag_evolucao_label"].fillna("Sem registro").value_counts().reset_index()
-            _ev.columns = ["evolucao", "n"]
-            _fig_ev = px.pie(
-                _ev, names="evolucao", values="n",
-                title="Desfecho (SRAG)",
-                hole=0.45,
-                color_discrete_map={
-                    "Cura": "#54A24B", "Obito": "#E45756",
-                    "Obito por outras causas": "#F58518",
-                    "Ignorado": "#9C9C9C", "Sem registro": "#CCCCCC",
-                },
+            _raca_counts = _ob["racacor"].value_counts().reset_index()
+            _raca_counts.columns = ["racacor", "n"]
+            _fig_raca = px.bar(
+                _raca_counts, x="n", y="racacor",
+                orientation="h",
+                title="Por Raça/Cor",
+                labels={"racacor": "", "n": "Óbitos"},
+                color_discrete_sequence=["#B279A2"],
             )
-            _fig_ev.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
-            st.plotly_chart(_fig_ev, use_container_width=True)
-            st.caption(f"Fonte: {_FONTE_PROG}")
-
-        st.markdown("---")
-
-        # ---- Gap distribution bar chart ------------------------------------
-        st.markdown("#### Intervalo entre notificação SG e SRAG")
-        _gap_order = ["0-7d", "8-14d", "15-30d", "31-60d", "61-90d", "91-180d", "181-365d", ">365d"]
-        _gap_cnt = (
-            _prog["gap_faixa"].value_counts()
-            .reindex(_gap_order).fillna(0).reset_index()
-        )
-        _gap_cnt.columns = ["intervalo", "n"]
-        _fig_gap = px.bar(
-            _gap_cnt, x="intervalo", y="n",
-            title="Dias entre notificação SG e SRAG",
-            labels={"intervalo": "Intervalo", "n": "Casos"},
-            color_discrete_sequence=["#B279A2"],
-            category_orders={"intervalo": _gap_order},
-        )
-        _fig_gap.update_layout(
-            margin=dict(l=20, r=20, t=50, b=60),
-            height=340,
-            plot_bgcolor="white",
-        )
-        st.plotly_chart(_fig_gap, use_container_width=True)
-        st.caption(f"Fonte: {_FONTE_PROG}")
-
-        st.markdown("---")
-
-        # ---- Onset and notification gap comparison --------------------------
-        st.markdown("#### Intervalos de tempo — sintomas e notificação")
-        st.caption(
-            "**Sintomas SG → Sintomas SRAG**: dias entre o início dos sintomas do episódio SG e o início dos sintomas do episódio SRAG. "
-            "**Notificação SG → Sintomas SRAG**: dias entre a notificação do caso SG e o início dos sintomas do SRAG. "
-            "Apenas intervalos positivos são exibidos (agravamento de SG para SRAG)."
-        )
-
-        _g_onset  = pd.to_numeric(_prog["gap_sintomas_dias"], errors="coerce").dropna()
-        _g_notif  = (
-            pd.to_datetime(_prog["srag_DT_SIN_PRI"], errors="coerce") -
-            pd.to_datetime(_prog["sg_DT_DIGITA"],    errors="coerce")
-        ).dt.days.dropna()
-
-        # Keep only positive gaps (SG precedes SRAG = severity increase)
-        _g_onset = _g_onset[_g_onset >= 0]
-        _g_notif = _g_notif[_g_notif >= 0]
-
-        _sym_bins   = [0, 7, 14, 30, 60, 90, 180, 365, 9999]
-        _sym_labels = ["0-7d", "8-14d", "15-30d", "31-60d", "61-90d", "91-180d", "181-365d", ">365d"]
-
-        def _bin_series(s):
-            return pd.cut(s, bins=_sym_bins, labels=_sym_labels, right=True, include_lowest=True)
-
-        _df_gaps = pd.DataFrame({
-            "Sintomas SG → Sintomas SRAG":   _bin_series(_g_onset).value_counts().reindex(_sym_labels).fillna(0),
-            "Notificação SG → Sintomas SRAG": _bin_series(_g_notif).value_counts().reindex(_sym_labels).fillna(0),
-        }).reset_index().rename(columns={"index": "intervalo"})
-        _df_gaps_long = _df_gaps.melt(id_vars="intervalo", var_name="Série", value_name="n")
-
-        _fig_gaps2 = px.bar(
-            _df_gaps_long, x="intervalo", y="n", color="Série", barmode="group",
-            title="Distribuição dos Intervalos Temporais",
-            labels={"intervalo": "Intervalo (dias)", "n": "Casos", "Série": ""},
-            color_discrete_map={
-                "Sintomas SG → Sintomas SRAG":    "#4C78A8",
-                "Notificação SG → Sintomas SRAG": "#F58518",
-            },
-            category_orders={"intervalo": _sym_labels},
-        )
-        _fig_gaps2.update_layout(
-            barmode="group",
-            xaxis_tickangle=-45,
-            legend=dict(orientation="h", y=1.1, x=0.5, xanchor="center"),
-            margin=dict(l=20, r=20, t=80, b=120),
-            height=440,
-            plot_bgcolor="white",
-        )
-        st.plotly_chart(_fig_gaps2, use_container_width=True)
-        st.caption(f"Fonte: {_FONTE_PROG}")
-
-        # ---- Characteristics profile table ---------------------------------
-        st.markdown("#### Perfil dos casos com progressão")
-
-        _prog_faixa = _prog.copy()
-        for _lbl, _msk in _PROG_FAIXA_BINS:
-            _prog_faixa.loc[_msk(_prog_faixa["_idade"]), "_faixa"] = _lbl
-
-        def _profile_block(series, label):
-            vc = series.value_counts(dropna=False)
-            pct = (vc / len(_prog) * 100).round(1)
-            df = pd.DataFrame({"Categoria": label, "Valor": vc.index.astype(str),
-                                "n": vc.values, "%": pct.values})
-            return df
-
-        _profile = pd.concat([
-            _profile_block(_prog["_sexo"].fillna("Ignorado"),            "Sexo"),
-            _profile_block(_prog_faixa["_faixa"].fillna("Sem dado"),     "Faixa etária"),
-            _profile_block(_prog["srag_classi_label"].fillna("Sem dado"),"Classificação Final"),
-        ], ignore_index=True)
-
-        _profile = _profile.sort_values(["Categoria", "n"], ascending=[True, False]).reset_index(drop=True)
-        st.dataframe(_profile, use_container_width=True, hide_index=True)
+            _fig_raca.update_layout(
+                yaxis=dict(autorange="reversed"),
+                margin=dict(l=10, r=10, t=50, b=10),
+                height=320,
+            )
+            st.plotly_chart(_fig_raca, use_container_width=True)
 
         st.markdown("---")
 
         # ---- Detailed table ------------------------------------------------
-        st.markdown("#### Tabela de Casos")
-        _tbl_p = _prog[[c for c in [
-            "sg_DT_DIGITA", "srag_DT_DIGITA", "gap_dias",
-            "_sexo", "_idade", "sg_NOM_BAIRRO",
-            "sg_classi_label", "srag_classi_label",
-            "srag_evolucao_label", "srag_NM_UN_INTE",
-        ] if c in _prog.columns]].copy()
-        _tbl_p = _tbl_p.rename(columns={
-            "sg_DT_DIGITA":        "Data SG",
-            "srag_DT_DIGITA":      "Data SRAG",
-            "gap_dias":            "Intervalo (dias)",
-            "_sexo":               "Sexo",
-            "_idade":              "Idade (SG)",
-            "sg_NOM_BAIRRO":       "Bairro",
-            "sg_classi_label":     "Classificação SG",
-            "srag_classi_label":   "Classificação SRAG",
-            "srag_evolucao_label": "Desfecho SRAG",
-            "srag_NM_UN_INTE":     "Hospital (SRAG)",
+        st.markdown("#### Tabela de Óbitos")
+        _tbl_ob = _ob[[
+            "datanotificacao", "sexo", "idade", "racacor",
+            "bairro", "sintomas", "tipoteste", "resultadofinal", "classificacaofinal",
+        ]].copy()
+        _tbl_ob["datanotificacao"] = _tbl_ob["datanotificacao"].dt.strftime("%d/%m/%Y")
+        _tbl_ob = _tbl_ob.rename(columns={
+            "datanotificacao":   "Data Notificação",
+            "sexo":              "Sexo",
+            "idade":             "Idade",
+            "racacor":           "Raça/Cor",
+            "bairro":            "Bairro",
+            "sintomas":          "Sintomas",
+            "tipoteste":         "Tipo de Teste",
+            "resultadofinal":    "Resultado Final",
+            "classificacaofinal":"Classificação Final",
         })
-        for _dc in ["Data SG", "Data SRAG"]:
-            if _dc in _tbl_p.columns:
-                _tbl_p[_dc] = pd.to_datetime(_tbl_p[_dc], errors="coerce").dt.strftime("%d/%m/%Y")
-        if "Bairro" in _tbl_p.columns:
-            _tbl_p["Bairro"] = _tbl_p["Bairro"].str.title()
-        if "Hospital (SRAG)" in _tbl_p.columns:
-            _tbl_p["Hospital (SRAG)"] = _tbl_p["Hospital (SRAG)"].str.title()
-        st.dataframe(_tbl_p, use_container_width=True, hide_index=True)
+        st.dataframe(_tbl_ob, use_container_width=True, hide_index=True)
