@@ -64,18 +64,18 @@ def intro():
     st.markdown("---")
     st.markdown("### Tutorial Rápido")
 
-    _vid_zoom  = Path(__file__).parent / "images" / "zoom em gráficos.mp4"
-    _vid_reset = Path(__file__).parent / "images" / "reset.mp4"
+    _gif_zoom  = Path(__file__).parent / "images" / "zoom.gif"
+    _gif_reset = Path(__file__).parent / "images" / "reset.gif"
 
     _tc1, _tc2 = st.columns(2)
     with _tc1:
         st.markdown("**Como aplicar zoom e filtrar nos gráficos**")
-        if _vid_zoom.exists():
-            st.video(str(_vid_zoom), autoplay=True, loop=True, muted=True)
+        if _gif_zoom.exists():
+            st.image(str(_gif_zoom), use_container_width=True)
     with _tc2:
         st.markdown("**Como resetar os eixos ao estado original**")
-        if _vid_reset.exists():
-            st.video(str(_vid_reset), autoplay=True, loop=True, muted=True)
+        if _gif_reset.exists():
+            st.image(str(_gif_reset), use_container_width=True)
 
 
 pg = st.navigation([
