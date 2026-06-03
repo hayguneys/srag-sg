@@ -333,6 +333,18 @@ def load_nowcast_table(filename: str) -> "pd.DataFrame | None":
     return df
 
 
+@st.cache_data(show_spinner="Carregando progressões SG→SRAG…")
+def load_sg_srag_linked() -> pd.DataFrame:
+    path = DATA_DIR / "sg_srag_linked.parquet"
+    if not path.exists():
+        return pd.DataFrame()
+    df = pd.read_parquet(path)
+    for c in ["sg_DT_DIGITA", "sg_DT_PRISINT", "srag_DT_DIGITA", "srag_DT_SIN_PRI"]:
+        if c in df.columns:
+            df[c] = pd.to_datetime(df[c], errors="coerce")
+    return df
+
+
 # --- eSUS extended loader (for Resumo Executivo KPI cards) ---------------
 @st.cache_data(show_spinner="Carregando eSUS — KPIs…")
 def load_esus_kpi() -> pd.DataFrame:
