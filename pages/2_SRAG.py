@@ -39,7 +39,7 @@ if st.session_state.pop("srag_goto_nowcasting", False):
     })();
     </script>""", height=0)
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Descritivo", "🦠 Testes", "📈 Nowcasting + Forecasting", "Óbitos", "📉 Taxa de Incidência"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Descritivo", "🦠 Testes", "📈 Nowcasting + Forecasting", "Óbitos"])
 
 # ============================================================
 # TAB 1 — Descriptive
@@ -216,6 +216,55 @@ with tab1:
         _bar_layout(_fig_rc)
         st.plotly_chart(_fig_rc, use_container_width=True)
         st.caption(f"Fonte: {_FONTE_SRAG}")
+
+    st.markdown("---")
+
+    # ---- Mapa de Taxa de Incidência por Distrito Sanitário -------------------
+    st.markdown("#### Taxa de Incidência por Distrito Sanitário (por 100.000 hab.)")
+
+    import streamlit.components.v1 as _cmp
+    from utils.helpers import load_bairro_distrito, _folium_choropleth_distritos, _DISTRITO_NAMES
+
+    @st.cache_data(show_spinner="Calculando incidência por distrito…")
+    def _srag_dist_incidence(year_lo, year_hi, unit):
+        _DS_POP = {
+            "DS I": 57466, "DS II": 211471, "DS III": 193372, "DS IV": 234614,
+            "DS V": 263748, "DS VI": 334271, "DS VII": 116463, "DS VIII": 228742,
+        }
+        bairro_ds = load_bairro_distrito()
+        _d = load_srag_withna()
+        _d = _d[_d["ID_MUNICIP"] == "RECIFE"].copy()
+        _d = _d[_d["DT_DIGITA"].dt.year.between(year_lo, year_hi)].copy()
+        _yr, _wk = paho_year_week(_d["DT_DIGITA"])
+        _d = _d[~((_yr == 2026) & (_wk > 16))]
+        if unit == "Unidades Municipais" and "NM_UN_INTE" in _d.columns:
+            _nm = _d["NM_UN_INTE"].str.upper().str.strip().fillna("")
+            _d = _d[_nm.apply(lambda x: any(kw in x for kw in _UNIDADES_KW_SRAG))].copy()
+        if "NM_BAIRRO" not in _d.columns:
+            return pd.DataFrame()
+        _d["bairro"] = _d["NM_BAIRRO"].str.upper().str.strip().fillna("")
+        _d = _d[_d["bairro"] != ""]
+        merged = _d.merge(bairro_ds, on="bairro", how="left").dropna(subset=["distrito"])
+        agg = merged.groupby("distrito").size().reset_index(name="n")
+        all_ds = pd.DataFrame({"distrito": list(_DISTRITO_NAMES.values())})
+        result = all_ds.merge(agg, on="distrito", how="left")
+        result["n"]    = result["n"].fillna(0).astype(int)
+        result["pop"]  = result["distrito"].map(_DS_POP)
+        result["taxa"] = (result["n"] / result["pop"] * 100_000).round(1)
+        return result[result["n"] > 0].reset_index(drop=True)
+
+    _srag_map_view = st.radio(
+        "Métrica", ["Taxa de incidência (por 100.000 hab.)", "Números absolutos"],
+        horizontal=True, key="srag_map_metric", label_visibility="collapsed",
+    )
+    _srag_dist = _srag_dist_incidence(_year_lo, _year_hi, _unit_filter)
+    if _srag_dist.empty:
+        st.info("Sem dados de distrito para os filtros selecionados.")
+    else:
+        _srag_map_col = "taxa" if _srag_map_view.startswith("Taxa") else "n"
+        _srag_dist_plot = _srag_dist[["distrito", "n", "taxa"]].copy()
+        _cmp.html(_folium_choropleth_distritos(_srag_dist_plot, color_col=_srag_map_col), height=520, scrolling=False)
+        st.caption(f"Fonte: {_FONTE_SRAG} · Pop. IBGE Censo 2022.")
 
     st.markdown("---")
     st.markdown("#### Internações por Faixa Etária")
@@ -881,60 +930,3 @@ with tab4:
             _tbl_ob["Hospital Internação"] = _tbl_ob["Hospital Internação"].str.title()
         st.dataframe(_tbl_ob, use_container_width=True, hide_index=True)
 
-# ============================================================
-# TAB 5 — Taxa de Incidência
-# ============================================================
-with tab5:
-    st.markdown("### Taxa de Incidência — SRAG (Recife, por 100.000 hab.)")
-    st.caption(
-        f"Taxa = (casos / {_RECIFE_POP:,} hab.) × 100.000 · "
-        "Fonte: IBGE Censo 2022. Casos filtrados por semana de digitação (DT_DIGITA)."
-    )
-
-    _ti_df = df_all[df_all["DT_DIGITA"].dt.year.between(2022, 2026)].copy()
-    _yr_ti, _wk_ti = paho_year_week(_ti_df["DT_DIGITA"])
-    _ti_df = _ti_df[~((_yr_ti == 2026) & (_wk_ti > 16))]
-    _yr_ti2, _wk_ti2 = paho_year_week(_ti_df["DT_DIGITA"])
-    _ti_df["semana"]      = "SE " + _wk_ti2.astype(str).str.zfill(2) + "/" + _yr_ti2.astype(str)
-    _ti_df["semana_sort"] = _yr_ti2 * 100 + _wk_ti2
-
-    _ti_agg = _ti_df.groupby(["semana", "semana_sort"]).size().reset_index(name="casos")
-    _ti_agg = _ti_agg.sort_values("semana_sort")
-    _ti_agg["taxa"] = (_ti_agg["casos"] / _RECIFE_POP * 100_000).round(2)
-
-    _fig_ti = go.Figure()
-    _fig_ti.add_trace(go.Bar(
-        x=_ti_agg["semana"], y=_ti_agg["casos"],
-        name="Casos", marker_color="#72B7B2", yaxis="y1",
-        hovertemplate="%{x}<br>Casos: %{y}<extra></extra>",
-    ))
-    _fig_ti.add_trace(go.Scatter(
-        x=_ti_agg["semana"], y=_ti_agg["taxa"],
-        name="Taxa por 100k", mode="lines+markers",
-        line=dict(color="#E45756", width=2), marker=dict(size=5),
-        yaxis="y2",
-        hovertemplate="%{x}<br>Taxa: %{y:.2f} por 100k<extra></extra>",
-    ))
-    _fig_ti.update_layout(
-        title="Taxa de Incidência Semanal — SRAG (por 100.000 hab.)",
-        xaxis=dict(title="Semana Epidemiológica", tickangle=-90,
-                   categoryorder="array", categoryarray=_ti_agg["semana"].tolist()),
-        yaxis=dict(title="Nº Casos", rangemode="tozero"),
-        yaxis2=dict(overlaying="y", side="right", showticklabels=False,
-                    showgrid=False, zeroline=False, title=""),
-        legend=dict(orientation="h", y=-0.28, x=0.5, xanchor="center"),
-        margin=dict(l=20, r=60, t=50, b=110),
-        height=580, plot_bgcolor="white",
-    )
-    st.plotly_chart(_fig_ti, use_container_width=True)
-    st.caption(f"Fonte: {_FONTE_SRAG}")
-
-    st.markdown("---")
-    st.markdown("#### Acumulado anual")
-    _ti_anual = _ti_df.groupby(_yr_ti2).size().reset_index(name="casos")
-    _ti_anual.columns = ["ano", "casos"]
-    _ti_anual["taxa"] = (_ti_anual["casos"] / _RECIFE_POP * 100_000).round(1)
-    st.dataframe(
-        _ti_anual.rename(columns={"ano": "Ano", "casos": "Casos", "taxa": "Taxa por 100k"}),
-        use_container_width=True, hide_index=True,
-    )
