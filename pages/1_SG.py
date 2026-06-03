@@ -467,8 +467,8 @@ with tab2:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    # ---- (Sivepi-GRIPE) Total (IFI + PCR) ----------------------------------------
-    st.markdown("### (Sivepi-GRIPE) Total de Testes e Taxa de Positividade")
+    # ---- (SIVEP-GRIPE) Total (IFI + PCR) ----------------------------------------
+    st.markdown("### (SIVEP-GRIPE) Total de Testes e Taxa de Positividade")
     st.caption("Soma de testes IFI e PCR Influenza realizados e taxa de positividade combinada.")
 
     _sg_base = _df_t2.dropna(subset=["DT_DIGITA"]).copy()
@@ -544,7 +544,7 @@ with tab2:
             ),
         ))
         _fig_tot_sg.update_layout(
-            title="(Sivepi-GRIPE) Total de Testes Realizados (IFI + PCR) e Taxa de Positividade",
+            title="(SIVEP-GRIPE) Total de Testes Realizados (IFI + PCR) e Taxa de Positividade",
             xaxis=dict(
                 title="Semana Epidemiológica",
                 tickangle=-90,
@@ -569,17 +569,17 @@ with tab2:
         st.plotly_chart(_fig_tot_sg, use_container_width=True)
 
     st.markdown("---")
-    st.markdown("### (Sivepi-GRIPE) Taxas de Positividade — IFI")
+    st.markdown("### (SIVEP-GRIPE) Taxas de Positividade — IFI")
     positividade_chart(
         _df_t2,
         total_col="IFI",      total_val=1,
         pos_col="IFI_RESUL",  pos_val=1,
         bar_name="Testes IFI", bar_color="#4C78A8",
-        titulo="(Sivepi-GRIPE) Testes IFI e Taxa de Positividade por Semana Epidemiológica",
+        titulo="(SIVEP-GRIPE) Testes IFI e Taxa de Positividade por Semana Epidemiológica",
     )
 
     st.markdown("---")
-    st.markdown("### (Sivepi-GRIPE) Taxas de Positividade — PCR Influenza")
+    st.markdown("### (SIVEP-GRIPE) Taxas de Positividade — PCR Influenza")
     pcr_view = st.radio(
         "Agrupamento", ["Semanal", "4 Semanas"],
         horizontal=True, key="pcr_group",
@@ -589,7 +589,7 @@ with tab2:
         total_col="PCR_RESUL",  total_val=1,
         pos_col="POS_PCRFLU",   pos_val=1,
         bar_name="Testes PCR",  bar_color="#54A24B",
-        titulo="(Sivepi-GRIPE) Testes PCR e Taxa de Positividade para Influenza por Semana Epidemiológica",
+        titulo="(SIVEP-GRIPE) Testes PCR e Taxa de Positividade para Influenza por Semana Epidemiológica",
         group_weeks=4 if pcr_view == "4 Semanas" else 1,
     )
 

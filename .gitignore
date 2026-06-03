@@ -14,6 +14,11 @@ data/ESUS Notifica_2026.csv
 data/geocode_bairros.py
 data/DICIO_*.pdf
 
+# Unused intermediate geo artefacts (not referenced by the app)
+data/*.shp
+data/*.shx
+data/recife_bairros_geo.csv
+
 # OS
 .DS_Store
 Thumbs.db

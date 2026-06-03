@@ -84,8 +84,11 @@ pg = st.navigation([
     st.Page("pages/2_SRAG.py", title="SRAG", icon="🫁"),
     st.Page("pages/3_Resumo_Executivo.py", title="Resumo Executivo", icon="📋"),
 ])
-pg.run()
 
+# Sidebar logo — rendered before the page runs so it appears at the top of the
+# sidebar on every page (above each page's own filters).
 _img = Path(__file__).parent / "images" / "regua vert.png"
 if _img.exists():
     st.sidebar.image(str(_img), use_container_width=True)
+
+pg.run()
