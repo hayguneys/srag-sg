@@ -10,7 +10,7 @@ import streamlit.components.v1 as components
 from utils.helpers import (
     load_sg, load_srag_withna, load_esus_kpi,
     render_kpis, fmt_int, paho_year_week,
-    embed_html_plot,
+    embed_html_plot, render_forecast_table,
     load_bairro_distrito, _folium_choropleth_distritos, _DISTRITO_NAMES,
 )
 
@@ -26,7 +26,7 @@ _DS_POP = {
 # ============================================================
 # SECTION 1 — KPI cards: eSUS-Notifica COVID
 # ============================================================
-st.markdown("## Casos COVID-19 — eSUS-Notifica")
+st.markdown("## Casos COVID-19")
 st.caption("Notificações 2022–2026 (todas as datas disponíveis). Testes positivos = resultadofinal 'Positivo'.")
 
 @st.cache_data(show_spinner="Calculando KPIs eSUS…")
@@ -45,6 +45,7 @@ render_kpis([
     ("Casos notificados", fmt_int(rec_total)),
     ("Testes positivos",  fmt_int(rec_pos)),
 ])
+st.caption("Fonte: BRASIL. Ministério da Saúde. eSUS-Notifica. Brasília, 2026.")
 
 st.markdown("---")
 
@@ -55,10 +56,16 @@ st.markdown("## Nowcasting + Forecasting")
 _fc1, _fc2 = st.columns(2)
 with _fc1:
     st.markdown("#### SG — Síndrome Gripal")
-    embed_html_plot("nowcasting_sg.html", height=520)
+    embed_html_plot("nowcasting_sg.html", height=520, fix_legend=True)
+    st.markdown("**Semanas previstas**")
+    render_forecast_table("nowcasting_sg.html", caption=False)
+    st.caption("Fonte: BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndrome Gripal. Brasília, 2026.")
 with _fc2:
     st.markdown("#### SRAG — Síndrome Respiratória Aguda Grave")
-    embed_html_plot("nowcasting_srag.html", height=520)
+    embed_html_plot("nowcasting_srag.html", height=520, fix_legend=True)
+    st.markdown("**Semanas previstas**")
+    render_forecast_table("nowcasting_srag.html", caption=False)
+    st.caption("Fonte: BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndromes Respiratórias Agudas Graves. Brasília, 2026.")
 
 st.markdown("---")
 

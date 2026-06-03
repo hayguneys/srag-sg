@@ -10,7 +10,7 @@ import streamlit as st
 
 from utils.helpers import (
     load_srag_withna, render_kpis, fmt_int,
-    embed_html_plot, render_ma_chart, load_nowcast_table, paho_year_week,
+    embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, DATA_DIR,
 )
 
@@ -179,6 +179,7 @@ with tab1:
             _add_pct_hover(_fig_sx, _agg_sx)
             _bar_layout(_fig_sx)
             st.plotly_chart(_fig_sx, use_container_width=True)
+    st.caption(f"Fonte: {_FONTE_SRAG}")
 
     st.markdown("---")
 
@@ -337,6 +338,7 @@ with tab1:
             _add_pct_hover(fig_h, agg_h, unit="internações")
             _bar_layout(fig_h)
             st.plotly_chart(fig_h, use_container_width=True)
+            st.caption(f"Fonte: {_FONTE_SRAG}")
 
 # ============================================================
 # TAB 2 — Tipos de Vírus
@@ -512,6 +514,7 @@ with tab2:
             plot_bgcolor="white",
         )
         st.plotly_chart(_fig_tot, use_container_width=True)
+        st.caption(f"Fonte: {_FONTE_SRAG}")
 
     st.markdown("---")
     st.markdown("### Teste Antigênico — Positividade por Tipo de Vírus")
@@ -546,6 +549,7 @@ with tab2:
         _add_pct_hover(_fig_v, _agg_v, unit="testes positivos")
         _bar_layout(_fig_v)
         st.plotly_chart(_fig_v, use_container_width=True)
+        st.caption(f"Fonte: {_FONTE_SRAG}")
 
     st.markdown("---")
     st.markdown("### PCR — Positividade por Tipo de Vírus")
@@ -580,6 +584,7 @@ with tab2:
         _add_pct_hover(_fig_p, _agg_p, unit="testes positivos")
         _bar_layout(_fig_p)
         st.plotly_chart(_fig_p, use_container_width=True)
+        st.caption(f"Fonte: {_FONTE_SRAG}")
 
 # ============================================================
 # TAB 3 — Nowcasting + Forecasting
@@ -590,22 +595,19 @@ with tab3:
         "Modelo INLA estruturado por idade (`bins_age = '10 years'`), "
         "`wdw = 230` semanas, `K = 4` semanas de forecast."
     )
-    embed_html_plot("nowcasting_srag.html", height=750)
+    embed_html_plot("nowcasting_srag.html", height=750, fix_legend=True)
+    st.caption(f"Fonte: {_FONTE_SRAG}")
 
     st.markdown("---")
     st.markdown("### Média Móvel — Semanas Epidemiológicas 2026")
     st.caption("Média móvel de 4 semanas sobre casos semanais por semana de início dos sintomas (`DT_SIN_PRI`).")
     render_ma_chart(df_all, onset_col="DT_SIN_PRI", titulo="Média Móvel 4 sem. — SRAG")
+    st.caption(f"Fonte: {_FONTE_SRAG}")
 
     st.markdown("---")
-    st.markdown("###Semanas previstas")
-    _tbl = load_nowcast_table("nowcasting_srag.html")
-    if _tbl is not None:
-        _fc = _tbl[_tbl["Tipo"] == "Forecast"].copy()
-        _fc["Data"] = _fc["Data"].dt.strftime("%d/%m/%Y")
-        st.dataframe(_fc.drop(columns=["Tipo"]), use_container_width=True, hide_index=True)
-    else:
-        st.info("Dados de nowcasting não disponíveis.")
+    st.markdown("### Semanas previstas")
+    render_forecast_table("nowcasting_srag.html")
+    st.caption(f"Fonte: {_FONTE_SRAG}")
 
 # ============================================================
 # TAB 4 — Óbitos
@@ -797,6 +799,8 @@ with tab4:
             )
             st.plotly_chart(_fig_cl, use_container_width=True)
 
+        st.caption(f"Fonte: {_FONTE_SRAG}")
+
         st.markdown("---")
 
         # ---- Timeline: óbitos por semana epidemiológica --------------------
@@ -824,11 +828,11 @@ with tab4:
             plot_bgcolor="white",
         )
         st.plotly_chart(_fig_tl, use_container_width=True)
+        st.caption(f"Fonte: {_FONTE_SRAG}")
 
         st.markdown("---")
 
         # ---- Heatmap — residência dos óbitos ----------------------------------
-        st.markdown("---")
         st.markdown("#### Mapa de Calor — Residência dos Óbitos (SRAG)")
         st.caption(
             "Localização aproximada por bairro de residência. "
@@ -909,6 +913,7 @@ with tab4:
                     f"Top bairro: **{_heat_data_df.nlargest(1,'weight').iloc[0]['official']}** "
                     f"({int(_heat_data_df['weight'].max())} óbitos)"
                 )
+                st.caption(f"Fonte: {_FONTE_SRAG}")
 
         st.markdown("---")
 
@@ -929,4 +934,5 @@ with tab4:
         if "Hospital Internação" in _tbl_ob.columns:
             _tbl_ob["Hospital Internação"] = _tbl_ob["Hospital Internação"].str.title()
         st.dataframe(_tbl_ob, use_container_width=True, hide_index=True)
+        st.caption(f"Fonte: {_FONTE_SRAG}")
 

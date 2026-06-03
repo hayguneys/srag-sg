@@ -10,7 +10,7 @@ import streamlit as st
 
 from utils.helpers import (
     load_sg, load_esus, load_sg_srag_linked, render_kpis, fmt_int,
-    embed_html_plot, render_ma_chart, load_nowcast_table, paho_year_week,
+    embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS,
 )
 
@@ -189,6 +189,7 @@ with tab1:
             _add_pct_hover(_fig_sx, _agg_sx)
             _bar_layout(_fig_sx)
             st.plotly_chart(_fig_sx, use_container_width=True)
+    st.caption(f"Fonte: {_FONTE_SG}")
 
     st.markdown("---")
 
@@ -311,6 +312,7 @@ with tab1:
             _add_pct_hover(_fig_f, _agg_f)
             _bar_layout(_fig_f)
             st.plotly_chart(_fig_f, use_container_width=True)
+            st.caption(f"Fonte: {_FONTE_SG}")
 
     # ---- FIN_SUBT — Influenza subtypes -----------------------------------------
     st.markdown("---")
@@ -359,6 +361,7 @@ with tab1:
             _add_pct_hover(_fig_s, _agg_s)
             _bar_layout(_fig_s)
             st.plotly_chart(_fig_s, use_container_width=True)
+            st.caption(f"Fonte: {_FONTE_SG}")
 
 
 # ============================================================
@@ -467,8 +470,8 @@ with tab2:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    # ---- (SIVEP-GRIPE) Total (IFI + PCR) ----------------------------------------
-    st.markdown("### (SIVEP-GRIPE) Total de Testes e Taxa de Positividade")
+    # ---- Total (IFI + PCR) ----------------------------------------
+    st.markdown("### Total de Testes e Taxa de Positividade")
     st.caption("Soma de testes IFI e PCR Influenza realizados e taxa de positividade combinada.")
 
     _sg_base = _df_t2.dropna(subset=["DT_DIGITA"]).copy()
@@ -544,7 +547,7 @@ with tab2:
             ),
         ))
         _fig_tot_sg.update_layout(
-            title="(SIVEP-GRIPE) Total de Testes Realizados (IFI + PCR) e Taxa de Positividade",
+            title="Total de Testes Realizados (IFI + PCR) e Taxa de Positividade",
             xaxis=dict(
                 title="Semana Epidemiológica",
                 tickangle=-90,
@@ -567,19 +570,21 @@ with tab2:
             plot_bgcolor="white",
         )
         st.plotly_chart(_fig_tot_sg, use_container_width=True)
+        st.caption(f"Fonte: {_FONTE_SG}")
 
     st.markdown("---")
-    st.markdown("### (SIVEP-GRIPE) Taxas de Positividade — IFI")
+    st.markdown("### Taxas de Positividade — IFI")
     positividade_chart(
         _df_t2,
         total_col="IFI",      total_val=1,
         pos_col="IFI_RESUL",  pos_val=1,
         bar_name="Testes IFI", bar_color="#4C78A8",
-        titulo="(SIVEP-GRIPE) Testes IFI e Taxa de Positividade por Semana Epidemiológica",
+        titulo="Testes IFI e Taxa de Positividade por Semana Epidemiológica",
     )
+    st.caption(f"Fonte: {_FONTE_SG}")
 
     st.markdown("---")
-    st.markdown("### (SIVEP-GRIPE) Taxas de Positividade — PCR Influenza")
+    st.markdown("### Taxas de Positividade — PCR Influenza")
     pcr_view = st.radio(
         "Agrupamento", ["Semanal", "4 Semanas"],
         horizontal=True, key="pcr_group",
@@ -589,13 +594,14 @@ with tab2:
         total_col="PCR_RESUL",  total_val=1,
         pos_col="POS_PCRFLU",   pos_val=1,
         bar_name="Testes PCR",  bar_color="#54A24B",
-        titulo="(SIVEP-GRIPE) Testes PCR e Taxa de Positividade para Influenza por Semana Epidemiológica",
+        titulo="Testes PCR e Taxa de Positividade para Influenza por Semana Epidemiológica",
         group_weeks=4 if pcr_view == "4 Semanas" else 1,
     )
+    st.caption(f"Fonte: {_FONTE_SG}")
 
     # ------------------------------------------------------------------ eSUS
     st.markdown("---")
-    st.markdown("### eSUS-Notifica — Total de Testes e Taxa de Positividade")
+    st.markdown("### Total de Testes e Taxa de Positividade — COVID-19")
     st.caption(
         "Testes por tipo (coluna `tipoteste`) agrupados por semana de notificação. "
         "Positividade = `resultadofinal == 'Positivo'` / (Positivo + Negativo)."
@@ -642,7 +648,7 @@ with tab2:
         _fig_e = px.bar(
             _agg_e, x="semana", y="n", color="tipoteste",
             color_discrete_map=ESUS_COLORS,
-            title="eSUS-Notifica — Total de Testes por Tipo e Semana Epidemiológica",
+            title="Total de Testes COVID-19 por Tipo e Semana Epidemiológica",
             labels={"semana": "Semana Epidemiológica", "n": "Nº Testes", "tipoteste": "Tipo de Teste"},
             category_orders={"semana": _ord_e, "tipoteste": _test_types},
         )
@@ -685,7 +691,7 @@ with tab2:
         _fig_e.update_layout(
             barmode="stack",
             xaxis=dict(
-                title="Semana Epidemiológica",
+                title=dict(text="Semana Epidemiológica", standoff=8),
                 tickangle=-90,
                 categoryorder="array",
                 categoryarray=_ord_e,
@@ -700,12 +706,13 @@ with tab2:
                 zeroline=False,
                 title="",
             ),
-            legend=dict(orientation="h", y=-0.28, x=0.5, xanchor="center"),
-            margin=dict(l=20, r=60, t=50, b=110),
-            height=580,
+            legend=dict(orientation="h", y=-0.40, x=0.5, xanchor="center", yanchor="top", title_text=""),
+            margin=dict(l=20, r=60, t=50, b=140),
+            height=600,
             plot_bgcolor="white",
         )
         st.plotly_chart(_fig_e, use_container_width=True)
+        st.caption(f"Fonte: {_FONTE_ESUS}")
 
 # ============================================================
 # TAB 3 — Nowcasting + Forecasting
@@ -716,22 +723,19 @@ with tab3:
         "Modelo INLA estruturado por idade (`bins_age = '10 years'`), "
         "`wdw = 230` semanas, `K = 8` semanas de forecast."
     )
-    embed_html_plot("nowcasting_sg.html", height=750)
+    embed_html_plot("nowcasting_sg.html", height=750, fix_legend=True)
+    st.caption(f"Fonte: {_FONTE_SG}")
 
     st.markdown("---")
     st.markdown("### Média Móvel — Semanas Epidemiológicas 2026")
     st.caption("Média móvel de 4 semanas sobre casos semanais por semana de início dos sintomas (`DT_PRISINT`).")
     render_ma_chart(df_all, onset_col="DT_PRISINT", titulo="Média Móvel 4 sem. — SG (ILI)")
+    st.caption(f"Fonte: {_FONTE_SG}")
 
     st.markdown("---")
-    st.markdown("###Semanas previstas")
-    _tbl = load_nowcast_table("nowcasting_sg.html")
-    if _tbl is not None:
-        _fc = _tbl[_tbl["Tipo"] == "Forecast"].copy()
-        _fc["Data"] = _fc["Data"].dt.strftime("%d/%m/%Y")
-        st.dataframe(_fc.drop(columns=["Tipo"]), use_container_width=True, hide_index=True)
-    else:
-        st.info("Dados de nowcasting não disponíveis.")
+    st.markdown("### Semanas previstas")
+    render_forecast_table("nowcasting_sg.html")
+    st.caption(f"Fonte: {_FONTE_SG}")
 
 # ============================================================
 # TAB 4 — Progressão SG → SRAG

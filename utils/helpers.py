@@ -69,19 +69,6 @@ def load_sg() -> pd.DataFrame:
     return df
 
 
-@st.cache_data(show_spinner="Carregando SRAG…")
-def load_srag() -> pd.DataFrame:
-    path = DATA_DIR / "srag_main.parquet"
-    if not path.exists():
-        st.error(f"Arquivo não encontrado: {path}")
-        st.stop()
-    df = pd.read_parquet(path)
-    for c in ("DT_DIGITA", "DT_SIN_PRI"):
-        if c in df.columns:
-            df[c] = pd.to_datetime(df[c], errors="coerce")
-    return df
-
-
 @st.cache_data(show_spinner="Carregando eSUS-Notifica…")
 def load_esus() -> pd.DataFrame:
     path = DATA_DIR / "eSUS_all.parquet"
@@ -93,28 +80,6 @@ def load_esus() -> pd.DataFrame:
     # Normalise em-dash vs hyphen in test type names
     df["tipoteste"] = df["tipoteste"].str.replace("–", "-", regex=False)
     return df
-
-
-@st.cache_data(show_spinner="Carregando óbitos eSUS…")
-def load_esus_obitos() -> pd.DataFrame:
-    path = DATA_DIR / "eSUS_all.parquet"
-    if not path.exists():
-        st.error(f"Arquivo não encontrado: {path}")
-        st.stop()
-    cols = [
-        "evolucaocaso", "datanotificacao", "datainiciosintomas",
-        "sexo", "idade", "bairro", "racacor",
-        "sintomas", "classificacaofinal",
-        "tipoteste", "resultadofinal", "municipio",
-    ]
-    df = pd.read_parquet(path, columns=cols)
-    df = df[df["evolucaocaso"] == "Óbito"].copy()
-    df["datanotificacao"]   = pd.to_datetime(df["datanotificacao"],   errors="coerce")
-    df["datainiciosintomas"] = pd.to_datetime(df["datainiciosintomas"], errors="coerce")
-    df["idade"] = pd.to_numeric(df["idade"], errors="coerce")
-    df["tipoteste"] = df["tipoteste"].str.replace("–", "-", regex=False)
-    df["bairro"] = df["bairro"].str.title()
-    return df.reset_index(drop=True)
 
 
 @st.cache_data(show_spinner="Carregando SRAG (with NA)…")
@@ -273,6 +238,16 @@ def render_ma_chart(
 
 # --- Nowcasting / Forecasting table from htmlwidgets HTML ----------------
 def load_nowcast_table(filename: str) -> "pd.DataFrame | None":
+    """Extract the nowcast/forecast estimates (and 95% CI) from a saved
+    htmlwidgets/plotly nowcasting HTML.
+
+    The plot stores, for each of "Nowcasting" and "Forecasting", two traces with
+    the same name:
+      * a line trace (fill is null) holding the central estimate per week, and
+      * a filled polygon trace (fill == "toself") holding the CI ribbon — the
+        lower bound left→right followed by the upper bound right→left, with the
+        end points duplicated to close the polygon.
+    """
     import re
     import json
     from datetime import date as _date, timedelta
@@ -286,44 +261,65 @@ def load_nowcast_table(filename: str) -> "pd.DataFrame | None":
     if not m:
         return None
 
-    data = json.loads(m.group(1))
+    try:
+        data = json.loads(m.group(1))
+    except (ValueError, TypeError):
+        return None
     traces = data.get("x", {}).get("data", [])
     epoch = _date(1970, 1, 1)
 
     def _d(v):
         return epoch + timedelta(days=int(v))
 
-    def _trace(name):
-        return next((t for t in traces if t.get("name") == name), None)
+    def _pick(name, *, filled):
+        for t in traces:
+            if t.get("name") != name:
+                continue
+            is_fill = str(t.get("fill") or "").lower() == "toself"
+            if is_fill == filled:
+                return t
+        return None
 
-    def _line(name):
-        t = _trace(name)
-        if not t:
+    def _estimate(name):
+        t = _pick(name, filled=False)
+        if not t or not t.get("x"):
             return {}
-        return {_d(x): round(float(y), 1) for x, y in zip(t["x"], t["y"]) if y is not None}
+        return {
+            _d(x): round(float(y), 1)
+            for x, y in zip(t["x"], t["y"]) if y is not None
+        }
 
     def _ci(name):
-        t = _trace(name)
-        if not t:
-            return {}, {}
-        xs, ys = t["x"], t["y"]
-        n = len(xs) // 2
-        lo = {_d(xs[i]): round(float(ys[i]), 1) for i in range(n - 1)}
-        hi = {_d(xs[i]): round(float(ys[i]), 1) for i in range(n, 2 * n - 1)}
-        return lo, hi
+        """Return {date: (lo, hi)} from the filled ribbon polygon.
 
-    nc_est = _line("(Nowcasting,1)")
-    fc_est = _line("(Forecasting,1)")
-    nc_lo, nc_hi = _ci("Nowcasting")
-    fc_lo, fc_hi = _ci("Forecasting")
+        The ribbon visits every week twice (once on the lower bound, once on the
+        upper) plus a couple of duplicated closing vertices. Grouping all y
+        values by date and taking min/max recovers the CI robustly regardless of
+        vertex ordering or duplicates.
+        """
+        t = _pick(name, filled=True)
+        if not t or not t.get("x"):
+            return {}
+        by_date: dict = {}
+        for x, y in zip(t["x"], t["y"]):
+            if y is None:
+                continue
+            by_date.setdefault(_d(x), []).append(float(y))
+        return {
+            d: (round(min(vs), 1), round(max(vs), 1))
+            for d, vs in by_date.items()
+        }
 
     rows = []
-    for d, est in sorted(nc_est.items()):
-        rows.append({"Data": d, "Tipo": "Nowcasting", "Estimativa": est,
-                     "IC Inferior": nc_lo.get(d, ""), "IC Superior": nc_hi.get(d, "")})
-    for d, est in sorted(fc_est.items()):
-        rows.append({"Data": d, "Tipo": "Forecast", "Estimativa": est,
-                     "IC Inferior": fc_lo.get(d, ""), "IC Superior": fc_hi.get(d, "")})
+    for label, tipo in (("Nowcasting", "Nowcasting"), ("Forecasting", "Forecast")):
+        est = _estimate(label)
+        ci = _ci(label)
+        for d, val in sorted(est.items()):
+            lo, hi = ci.get(d, ("", ""))
+            rows.append({
+                "Data": d, "Tipo": tipo, "Estimativa": val,
+                "IC Inferior": lo, "IC Superior": hi,
+            })
 
     if not rows:
         return None
@@ -331,6 +327,35 @@ def load_nowcast_table(filename: str) -> "pd.DataFrame | None":
     df = pd.DataFrame(rows)
     df["Data"] = pd.to_datetime(df["Data"])
     return df
+
+
+def render_forecast_table(filename: str, caption: bool = True) -> None:
+    """Render a compact table of the forecasted weeks from a nowcasting HTML.
+
+    Shows, for each projected week, the epidemiological week, the date, the
+    central estimate (median) and the 95% credible interval.
+    """
+    tbl = load_nowcast_table(filename)
+    fc = tbl[tbl["Tipo"] == "Forecast"].copy() if tbl is not None else None
+    if fc is None or fc.empty:
+        st.info("Dados de forecast não disponíveis.")
+        return
+
+    yr, wk = paho_year_week(fc["Data"])
+    fc["Semana Epidemiológica"] = [f"SE{int(w):02d}/{int(y)}" for y, w in zip(yr, wk)]
+    fc["Data"] = fc["Data"].dt.strftime("%d/%m/%Y")
+    fc["IC 95%"] = [
+        f"{lo:.0f} – {hi:.0f}" if lo != "" and hi != "" else "—"
+        for lo, hi in zip(fc["IC Inferior"], fc["IC Superior"])
+    ]
+    fc["Casos estimados"] = fc["Estimativa"].round(0).astype("Int64")
+    show = fc[["Semana Epidemiológica", "Data", "Casos estimados", "IC 95%"]]
+    if caption:
+        st.caption(
+            "Estimativa de casos (mediana) e intervalo de credibilidade de 95% "
+            "para as semanas projetadas pelo modelo."
+        )
+    st.dataframe(show, use_container_width=True, hide_index=True)
 
 
 # --- Choropleth map (distritos sanitários) — Leaflet / folium -----------
@@ -479,26 +504,56 @@ def load_esus_kpi() -> pd.DataFrame:
     return df
 
 
-@st.cache_data(show_spinner="Carregando eSUS — incidência por bairro…")
-def load_esus_incidencia() -> pd.DataFrame:
-    """Load eSUS with bairro of residence for incidence heatmap."""
-    path = DATA_DIR / "eSUS_all.parquet"
-    if not path.exists():
-        return pd.DataFrame()
-    want = ["datanotificacao", "bairro", "municipio", "municipionotificacao",
-            "estadonotificacao", "resultadofinal"]
-    try:
-        df = pd.read_parquet(path, columns=want)
-    except Exception:
-        df = pd.read_parquet(path)
-        df = df[[c for c in want if c in df.columns]]
-    df["datanotificacao"] = pd.to_datetime(df["datanotificacao"], errors="coerce")
-    return df
-
-
 # --- HTML plot embed -----------------------------------------------------
-def embed_html_plot(filename: str, height: int = 700) -> None:
-    """Load a saved plotly HTML, inline any external *_files/ assets, and embed."""
+def _fix_nowcast_legend(html: str) -> str:
+    """Repair the legend in a ggplotly nowcasting widget.
+
+    ggplotly emits a horizontal legend whose items are not spaced out, so the
+    four series labels render stacked on the same point. Rewrite the widget's
+    `layout.legend` block to a cleanly spaced horizontal legend.
+    """
+    import json
+    import re
+
+    m = re.search(r'(<script type="application/json"[^>]*>)(.*?)(</script>)', html, re.DOTALL)
+    if not m:
+        return html
+    try:
+        data = json.loads(m.group(2))
+    except (ValueError, TypeError):
+        return html
+
+    layout = data.get("x", {}).get("layout")
+    if not isinstance(layout, dict):
+        return html
+
+    layout["showlegend"] = True
+    layout["legend"] = {
+        "orientation": "h",
+        "x": 0.5, "xanchor": "center",
+        "y": -0.18, "yanchor": "top",
+        "font": {"size": 13},
+        "bgcolor": "rgba(255,255,255,0)",
+        "bordercolor": "transparent",
+        "traceorder": "normal",
+        "itemwidth": 30,
+        "tracegroupgap": 10,
+    }
+    # Give the legend room below the plot so it is not clipped.
+    margin = layout.setdefault("margin", {})
+    if isinstance(margin, dict):
+        margin["b"] = max(int(margin.get("b", 0) or 0), 90)
+
+    new_json = json.dumps(data)
+    return html[: m.start()] + m.group(1) + new_json + m.group(3) + html[m.end():]
+
+
+def embed_html_plot(filename: str, height: int = 700, fix_legend: bool = False) -> None:
+    """Load a saved plotly HTML, inline any external *_files/ assets, and embed.
+
+    When ``fix_legend`` is True, repair the ggplotly horizontal legend so the
+    series labels are spaced out instead of overlapping on a single point.
+    """
     import re
     import streamlit.components.v1 as components
 
@@ -509,6 +564,9 @@ def embed_html_plot(filename: str, height: int = 700) -> None:
 
     html = path.read_text(encoding="utf-8")
     base_dir = path.parent
+
+    if fix_legend:
+        html = _fix_nowcast_legend(html)
 
     def _inline_css(m):
         css_path = base_dir / m.group(1)

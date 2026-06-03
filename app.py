@@ -67,14 +67,18 @@ def intro():
     _gif_zoom  = Path(__file__).parent / "images" / "zoom.gif"
     _gif_reset = Path(__file__).parent / "images" / "reset.gif"
 
-    _tc1, _tc2 = st.columns(2)
-    with _tc1:
-        st.markdown("**Como aplicar zoom e filtrar nos gráficos**")
-        if _gif_zoom.exists():
-            st.image(str(_gif_zoom), use_container_width=True)
-    with _tc2:
-        st.markdown("**Como resetar os eixos ao estado original**")
-        if _gif_reset.exists():
+    # Zoom tutorial — its own row.
+    st.markdown("**Como aplicar zoom e filtrar nos gráficos**")
+    if _gif_zoom.exists():
+        st.image(str(_gif_zoom), use_container_width=True)
+
+    st.markdown("")
+
+    # Reset tutorial — its own row, centered.
+    st.markdown("<p style='text-align:center'><strong>Como resetar os eixos ao estado original</strong></p>", unsafe_allow_html=True)
+    if _gif_reset.exists():
+        _rl, _rc, _rr = st.columns([1, 2, 1])
+        with _rc:
             st.image(str(_gif_reset), use_container_width=True)
 
 
