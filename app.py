@@ -67,34 +67,15 @@ def intro():
     _vid_zoom  = Path(__file__).parent / "images" / "zoom em gráficos.mp4"
     _vid_reset = Path(__file__).parent / "images" / "reset.mp4"
 
-    import base64
-    import streamlit.components.v1 as _c
-
-    def _gif_video(path: Path, width: str = "100%", height: int = 400):
-        if not path.exists():
-            return
-        b64 = base64.b64encode(path.read_bytes()).decode()
-        _c.html(
-            f'<video autoplay loop muted playsinline '
-            f'style="width:{width};max-width:100%;display:block;">'
-            f'<source src="data:video/mp4;base64,{b64}" type="video/mp4">'
-            f'</video>',
-            height=height,
-        )
-
-    st.markdown("**Como aplicar zoom e filtrar nos gráficos**")
-    _gif_video(_vid_zoom, width="100%", height=420)
-
-    st.markdown("**Como resetar os eixos ao estado original**")
-    if _vid_reset.exists():
-        b64r = base64.b64encode(_vid_reset.read_bytes()).decode()
-        _c.html(
-            f'<div style="display:flex;justify-content:center;">'
-            f'<video autoplay loop muted playsinline style="width:20%;max-width:100%;">'
-            f'<source src="data:video/mp4;base64,{b64r}" type="video/mp4">'
-            f'</video></div>',
-            height=350,
-        )
+    _tc1, _tc2 = st.columns(2)
+    with _tc1:
+        st.markdown("**Como aplicar zoom e filtrar nos gráficos**")
+        if _vid_zoom.exists():
+            st.video(str(_vid_zoom), autoplay=True, loop=True, muted=True)
+    with _tc2:
+        st.markdown("**Como resetar os eixos ao estado original**")
+        if _vid_reset.exists():
+            st.video(str(_vid_reset), autoplay=True, loop=True, muted=True)
 
 
 pg = st.navigation([
