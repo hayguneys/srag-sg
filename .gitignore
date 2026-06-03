@@ -18,6 +18,11 @@ data/DICIO_*.pdf
 data/*.shp
 data/*.shx
 data/recife_bairros_geo.csv
+data/bairros_recife.geojson
+
+# Unused nowcasting plot (only sg/srag are embedded)
+plots/nowcasting_esus.html
+plots/nowcasting_esus_files/
 
 # OS
 .DS_Store

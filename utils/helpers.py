@@ -333,7 +333,7 @@ def load_nowcast_table(filename: str) -> "pd.DataFrame | None":
     return df
 
 
-# --- Choropleth maps (bairros + distritos) — Leaflet / folium -----------
+# --- Choropleth map (distritos sanitários) — Leaflet / folium -----------
 
 _DISTRITO_NAMES = {
     1: "DS I", 2: "DS II", 3: "DS III",
@@ -343,77 +343,6 @@ _DISTRITO_NAMES = {
 
 # Harvard crimson 7-step scale (light → dark)
 _CRIMSON_STEPS = ["#fdf2f1", "#f5c6c2", "#e8827b", "#d94f45", "#b52d24", "#8b1a14", "#6b0001"]
-
-
-def _folium_choropleth_bairros(data: pd.DataFrame, color_col: str = "n") -> str:
-    """Return folium HTML string: bairro-level choropleth on Leaflet/OSM."""
-    import json
-    import folium
-    from folium import Choropleth
-
-    path = DATA_DIR / "bairros_recife.geojson"
-    if not path.exists():
-        return "<p>GeoJSON de bairros não encontrado.</p>"
-
-    geojson = json.loads(path.read_text(encoding="utf-8"))
-
-    # Normalize and deduplicate (sum) by bairro
-    df = data.copy()
-    df["bairro"] = df["bairro"].str.upper().str.strip()
-    df = df.groupby("bairro")[color_col].sum().reset_index()
-
-    # Add missing bairros with zero so every polygon has a value
-    bairros_geo = [f["properties"].get("bairro", "") for f in geojson["features"]]
-    existing = set(df["bairro"])
-    zeros = pd.DataFrame(
-        [{"bairro": b, color_col: 0} for b in bairros_geo if b and b not in existing]
-    )
-    if not zeros.empty:
-        df = pd.concat([df, zeros], ignore_index=True)
-
-    m = folium.Map(
-        location=[-8.052, -34.95],
-        zoom_start=11,
-        tiles="CartoDB positron",
-        control_scale=True,
-    )
-
-    Choropleth(
-        geo_data=geojson,
-        data=df,
-        columns=["bairro", color_col],
-        key_on="feature.properties.bairro",
-        fill_color="YlOrRd",
-        fill_opacity=0.75,
-        line_opacity=0.4,
-        line_color="#ffffff",
-        line_weight=0.8,
-        legend_name=color_col,
-        bins=7,
-        nan_fill_color="#e8e8e8",
-        nan_fill_opacity=0.4,
-    ).add_to(m)
-
-    # Tooltip with bairro name + value
-    val_map = df.set_index("bairro")[color_col].to_dict()
-    style_fn = lambda feat: {
-        "fillColor": "transparent",
-        "color": "transparent",
-        "weight": 0,
-    }
-    tooltip_fn = folium.GeoJsonTooltip(
-        fields=["bairro"],
-        aliases=["Bairro:"],
-        localize=True,
-    )
-    folium.GeoJson(
-        geojson,
-        style_function=style_fn,
-        tooltip=tooltip_fn,
-        popup=folium.GeoJsonPopup(fields=["bairro"], aliases=["Bairro:"]),
-    ).add_to(m)
-
-    return m._repr_html_()
 
 
 def _folium_choropleth_distritos(data: pd.DataFrame, color_col: str = "n") -> str:
@@ -507,53 +436,6 @@ def _folium_choropleth_distritos(data: pd.DataFrame, color_col: str = "n") -> st
     ).add_to(m)
 
     return m._repr_html_()
-
-
-def leaflet_choropleth(
-    data_bairros: pd.DataFrame,
-    data_distritos: pd.DataFrame,
-    toggle_key: str,
-    height: int = 540,
-    color_col: str = "n",
-) -> None:
-    """Render a Leaflet choropleth with a Streamlit toggle for bairros vs distritos."""
-    import streamlit.components.v1 as components
-
-    view = st.radio(
-        "Nível de detalhe",
-        ["Bairros", "Distritos Sanitários"],
-        horizontal=True,
-        key=toggle_key,
-        label_visibility="collapsed",
-    )
-
-    if view == "Bairros":
-        html = _folium_choropleth_bairros(data_bairros, color_col)
-    else:
-        html = _folium_choropleth_distritos(data_distritos, color_col)
-
-    components.html(html, height=height, scrolling=False)
-
-
-# Keep old names as thin wrappers for backward compatibility
-def choropleth_bairros(
-    data: pd.DataFrame,
-    title: str = "Casos por Bairro",
-    color_col: str = "n",
-):
-    import streamlit.components.v1 as components
-    html = _folium_choropleth_bairros(data, color_col)
-    components.html(html, height=540, scrolling=False)
-
-
-def choropleth_distritos(
-    data: pd.DataFrame,
-    title: str = "Casos por Distrito Sanitário",
-    color_col: str = "n",
-):
-    import streamlit.components.v1 as components
-    html = _folium_choropleth_distritos(data, color_col)
-    components.html(html, height=540, scrolling=False)
 
 
 # --- Bairro → Distrito Sanitário lookup ---------------------------------
