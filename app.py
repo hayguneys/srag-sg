@@ -23,7 +23,7 @@ def intro():
         Use o menu lateral para navegar:
 
         - **SG** — Síndrome Gripal · abas: Descritivo · Testes · Nowcasting + Forecasting · Progressão para SRAG
-        - **SRAG** — Síndrome Respiratória Aguda Grave · abas: Descritivo · Testes · Nowcasting + Forecasting · Óbitos
+        - **SRAG** — Síndrome Respiratória Aguda Grave · abas: Descritivo (com filtro Casos / Óbitos) · Testes · Nowcasting + Forecasting
         - **Resumo Executivo** — Sumário rápido das informações do painel
 
         ---

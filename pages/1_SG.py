@@ -22,7 +22,26 @@ st.title("🤧 SG — Síndrome Gripal")
 df_all = load_sg()
 df_all = df_all[df_all["COD_MUNIC"] == 261160].copy()
 
-_UNIDADES_KW_SG = ["BARROS LIMA", "ARNALDO MARQUES", "AMAURY COUTINHO", "AGAMENON", "CRAVO GAMA"]
+# Per-clinic selector: display name -> substring matched against NOME_UNIDA.
+_CLINICAS_SG = {
+    "Barros Lima":          "BARROS LIMA",
+    "Policlínica Agamenon": "AGAMENON",
+    "Arnaldo Marques":      "ARNALDO MARQUES",
+    "Bandeira Filho":       "BANDEIRA FILHO",
+    "Amaury Coutinho":      "AMAURY COUTINHO",
+    "Cravo Gama":           "CRAVO GAMA",
+}
+
+
+def _filtra_clinicas_sg(df, selecionadas):
+    """Keep rows whose NOME_UNIDA matches any selected clinic. Empty = todas."""
+    if not selecionadas or "NOME_UNIDA" not in df.columns:
+        return df
+    _kw = [_CLINICAS_SG[c] for c in selecionadas if c in _CLINICAS_SG]
+    if not _kw:
+        return df
+    _nm = df["NOME_UNIDA"].str.upper().str.strip().fillna("")
+    return df[_nm.apply(lambda x: any(k in x for k in _kw))].copy()
 
 _FONTE_SG   = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP"
 _FONTE_ESUS = "SESAU/SEVS/GGAM/GEVEPI/DDT/ESUS"
@@ -30,6 +49,16 @@ _FONTE_PROG = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP"
 
 # Recife total population (IBGE Censo 2022) for incidence rate per 100k
 _RECIFE_POP = 1_640_147
+
+_SG_RACA_LABELS = {1: "Branca", 2: "Preta", 3: "Amarela", 4: "Parda", 5: "Indígena", 9: "Ignorado"}
+_SG_RACA_COLORS = {
+    "Branca":   "#4C78A8",
+    "Preta":    "#F58518",
+    "Amarela":  "#E45756",
+    "Parda":    "#72B7B2",
+    "Indígena": "#54A24B",
+    "Ignorado": "#B279A2",
+}
 
 if st.session_state.pop("sg_goto_nowcasting", False):
     import streamlit.components.v1 as components
@@ -58,15 +87,14 @@ with tab1:
             "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="sg_desc_year",
         )
     with _c_unit:
-        _unit_filter = st.radio(
-            "Unidade de saúde", ["Todas", "Unidades Municipais"],
-            horizontal=True, key="sg_desc_unit",
+        _unit_filter = st.multiselect(
+            "Unidade de saúde", list(_CLINICAS_SG.keys()),
+            default=[], key="sg_desc_unit",
+            placeholder="Todas as unidades",
         )
 
     df_filt = df_all[df_all["DT_DIGITA"].dt.year.between(_year_lo, _year_hi)].copy()
-    if _unit_filter == "Unidades Municipais":
-        _nm = df_filt["NOME_UNIDA"].str.upper().str.strip().fillna("")
-        df_filt = df_filt[_nm.apply(lambda x: any(kw in x for kw in _UNIDADES_KW_SG))].copy()
+    df_filt = _filtra_clinicas_sg(df_filt, _unit_filter)
     _yr_f, _wk_f = paho_year_week(df_filt["DT_DIGITA"])
     if _year_hi == 2026:
         df_filt = df_filt[~((_yr_f == 2026) & (_wk_f > 16))]
@@ -113,7 +141,7 @@ with tab1:
             )
 
     # ---- Faixa Etária — all cases ----------------------------------------
-    st.markdown("#### Casos por Faixa Etária")
+    st.markdown("#### Total de Casos")
 
     FAIXA_BINS = [
         ("1–4",   lambda a: (a >= 1)  & (a <= 4)),
@@ -137,7 +165,7 @@ with tab1:
     }
 
     _faixa_view = st.radio(
-        "Visualização", ["Faixa Etária", "Sexo"],
+        "Visualização", ["Faixa Etária", "Sexo", "Raça/Cor"],
         horizontal=True, key="sg_faixa_view",
     )
 
@@ -148,26 +176,27 @@ with tab1:
         _age.loc[_mask(_age["IDADE"]), "faixa"] = _label
     _age = _age.dropna(subset=["faixa"])
 
-    if _age.empty:
-        st.info("Sem dados de faixa etária.")
-    elif _faixa_view == "Faixa Etária":
-        _yr_a, _wk_a = paho_year_week(_age["DT_DIGITA"])
-        _age["semana"]      = "SE " + _wk_a.astype(str).str.zfill(2) + "/" + _yr_a.astype(str)
-        _age["semana_sort"] = _yr_a * 100 + _wk_a
-        _agg_a = _age.groupby(["semana", "semana_sort", "faixa"]).size().reset_index(name="n")
-        _ord_a = _agg_a[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
-        _fig_a = px.bar(
-            _agg_a, x="semana", y="n", color="faixa",
-            color_discrete_map=FAIXA_COLORS,
-            title="Casos por Faixa Etária por Semana Epidemiológica",
-            labels={"semana": "Semana Epidemiológica", "n": "Nº Casos", "faixa": "Faixa Etária"},
-            category_orders={"semana": _ord_a, "faixa": [l for l, _ in FAIXA_BINS]},
-        )
-        _add_pct_hover(_fig_a, _agg_a)
-        _bar_layout(_fig_a)
-        st.plotly_chart(_fig_a, use_container_width=True)
-    else:
-        _sx = _age.copy()
+    if _faixa_view == "Faixa Etária":
+        if _age.empty:
+            st.info("Sem dados de faixa etária.")
+        else:
+            _yr_a, _wk_a = paho_year_week(_age["DT_DIGITA"])
+            _age["semana"]      = "SE " + _wk_a.astype(str).str.zfill(2) + "/" + _yr_a.astype(str)
+            _age["semana_sort"] = _yr_a * 100 + _wk_a
+            _agg_a = _age.groupby(["semana", "semana_sort", "faixa"]).size().reset_index(name="n")
+            _ord_a = _agg_a[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
+            _fig_a = px.bar(
+                _agg_a, x="semana", y="n", color="faixa",
+                color_discrete_map=FAIXA_COLORS,
+                title="Total de Casos por Semana Epidemiológica",
+                labels={"semana": "Semana Epidemiológica", "n": "Nº Casos", "faixa": "Faixa Etária"},
+                category_orders={"semana": _ord_a, "faixa": [l for l, _ in FAIXA_BINS]},
+            )
+            _add_pct_hover(_fig_a, _agg_a)
+            _bar_layout(_fig_a)
+            st.plotly_chart(_fig_a, use_container_width=True)
+    elif _faixa_view == "Sexo":
+        _sx = df_filt.dropna(subset=["DT_DIGITA"]).copy()
         _sx["SEXO"] = pd.to_numeric(_sx["SEXO"], errors="coerce")
         _sx = _sx[_sx["SEXO"].isin([1, 2])]
         _sx["SEXO_LABEL"] = _sx["SEXO"].astype(int).map({1: "Masculino", 2: "Feminino"})
@@ -189,33 +218,29 @@ with tab1:
             _add_pct_hover(_fig_sx, _agg_sx)
             _bar_layout(_fig_sx)
             st.plotly_chart(_fig_sx, use_container_width=True)
+    else:  # Raça/Cor
+        _rc = df_filt.dropna(subset=["DT_DIGITA"]).copy()
+        _rc["RACA_LABEL"] = pd.to_numeric(_rc["RACA"], errors="coerce").map(_SG_RACA_LABELS)
+        _rc = _rc.dropna(subset=["RACA_LABEL"])
+        if _rc.empty:
+            st.info("Sem dados de raça/cor.")
+        else:
+            _yr_rc, _wk_rc = paho_year_week(_rc["DT_DIGITA"])
+            _rc["semana"]      = "SE " + _wk_rc.astype(str).str.zfill(2) + "/" + _yr_rc.astype(str)
+            _rc["semana_sort"] = _yr_rc * 100 + _wk_rc
+            _agg_rc = _rc.groupby(["semana", "semana_sort", "RACA_LABEL"]).size().reset_index(name="n")
+            _ord_rc = _agg_rc[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
+            _fig_rc = px.bar(
+                _agg_rc, x="semana", y="n", color="RACA_LABEL",
+                color_discrete_map=_SG_RACA_COLORS,
+                title="Total de Casos por Raça/Cor por Semana Epidemiológica",
+                labels={"semana": "Semana Epidemiológica", "n": "Nº Casos", "RACA_LABEL": "Raça/Cor"},
+                category_orders={"semana": _ord_rc, "RACA_LABEL": list(_SG_RACA_LABELS.values())},
+            )
+            _add_pct_hover(_fig_rc, _agg_rc)
+            _bar_layout(_fig_rc)
+            st.plotly_chart(_fig_rc, use_container_width=True)
     st.caption(f"Fonte: {_FONTE_SG}")
-
-    st.markdown("---")
-
-    # ---- Raça/Cor — Casos Totais ---------------------------------------------
-    st.markdown("#### Casos Totais por Raça/Cor")
-
-    _raca = df_filt.dropna(subset=["DT_DIGITA"]).copy()
-
-    if _raca.empty:
-        st.info("Sem dados para os filtros selecionados.")
-    else:
-        _yr_rc, _wk_rc = paho_year_week(_raca["DT_DIGITA"])
-        _raca["semana"]      = "SE " + _wk_rc.astype(str).str.zfill(2) + "/" + _yr_rc.astype(str)
-        _raca["semana_sort"] = _yr_rc * 100 + _wk_rc
-        _agg_rc = _raca.groupby(["semana", "semana_sort"]).size().reset_index(name="n")
-        _ord_rc = _agg_rc[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
-        _fig_rc = px.bar(
-            _agg_rc, x="semana", y="n",
-            color_discrete_sequence=["#4C78A8"],
-            title="Casos Totais por Semana Epidemiológica",
-            labels={"semana": "Semana Epidemiológica", "n": "Nº Casos"},
-            category_orders={"semana": _ord_rc},
-        )
-        _bar_layout(_fig_rc)
-        st.plotly_chart(_fig_rc, use_container_width=True)
-        st.caption(f"Fonte: {_FONTE_SG}")
 
     st.markdown("---")
 
@@ -226,7 +251,7 @@ with tab1:
     from utils.helpers import load_bairro_distrito, _folium_choropleth_distritos, _DISTRITO_NAMES
 
     @st.cache_data(show_spinner="Calculando incidência por distrito…")
-    def _sg_dist_incidence(year_lo, year_hi, unit):
+    def _sg_dist_incidence(year_lo, year_hi, clinicas):
         _DS_POP = {
             "DS I": 57466, "DS II": 211471, "DS III": 193372, "DS IV": 234614,
             "DS V": 263748, "DS VI": 334271, "DS VII": 116463, "DS VIII": 228742,
@@ -237,9 +262,7 @@ with tab1:
         _d = _d[_d["DT_DIGITA"].dt.year.between(year_lo, year_hi)].copy()
         _yr, _wk = paho_year_week(_d["DT_DIGITA"])
         _d = _d[~((_yr == 2026) & (_wk > 16))]
-        if unit == "Unidades Municipais":
-            _nm = _d["NOME_UNIDA"].str.upper().str.strip().fillna("")
-            _d = _d[_nm.apply(lambda x: any(kw in x for kw in _UNIDADES_KW_SG))].copy()
+        _d = _filtra_clinicas_sg(_d, list(clinicas))
         if "NOM_BAIRRO" not in _d.columns:
             return pd.DataFrame()
         _d["bairro"] = _d["NOM_BAIRRO"].str.upper().str.strip().fillna("")
@@ -257,7 +280,7 @@ with tab1:
         "Métrica", ["Taxa de incidência (por 100.000 hab.)", "Números absolutos"],
         horizontal=True, key="sg_map_metric", label_visibility="collapsed",
     )
-    _sg_dist = _sg_dist_incidence(_year_lo, _year_hi, _unit_filter)
+    _sg_dist = _sg_dist_incidence(_year_lo, _year_hi, tuple(_unit_filter))
     if _sg_dist.empty:
         st.info("Sem dados de distrito para os filtros selecionados.")
     else:
@@ -266,12 +289,38 @@ with tab1:
         _cmp.html(_folium_choropleth_distritos(_sg_dist_plot, color_col=_sg_map_col), height=520, scrolling=False)
         st.caption(f"Fonte: {_FONTE_SG} · Pop. IBGE Censo 2022.")
 
-    # ---- FIN_FLU — Influenza type ----------------------------------------------
+    # ---- FIN_FLU — Influenza type (A segmented by FIN_SUBT subtypes) ------------
     st.markdown("---")
     st.markdown("#### Tipo de Influenza ")
 
-    FIN_FLU_LABELS = {1: "Influenza A", 2: "Influenza B"}
-    FIN_FLU_COLORS = {"Influenza A": "#E45756", "Influenza B": "#4C78A8"}
+    # Influenza A is broken down into its FIN_SUBT subtypes; Influenza B stays
+    # a single category. Influenza A rows without a mapped subtype fall back to
+    # a generic "Influenza A" bucket so no case is dropped.
+    FIN_SUBT_LABELS = {
+        1: "Influenza A (H1N1)pdm09",
+        4: "Influenza A não subtipado",
+        6: "Influenza A (H3N2)",
+        7: "Influenza A não subtipável",
+        8: "Inconclusivo",
+    }
+    FLU_COMBINED_COLORS = {
+        "Influenza A (H1N1)pdm09":    "#E45756",
+        "Influenza A (H3N2)":         "#F58518",
+        "Influenza A não subtipado":  "#9C9C9C",
+        "Influenza A não subtipável": "#72B7B2",
+        "Inconclusivo":               "#B279A2",
+        "Influenza A":                "#D62728",
+        "Influenza B":                "#4C78A8",
+    }
+    FLU_COMBINED_ORDER = [
+        "Influenza A (H1N1)pdm09",
+        "Influenza A (H3N2)",
+        "Influenza A não subtipado",
+        "Influenza A não subtipável",
+        "Inconclusivo",
+        "Influenza A",
+        "Influenza B",
+    ]
 
     if "FIN_FLU" not in df_filt.columns:
         st.warning("Coluna FIN_FLU não encontrada.")
@@ -280,8 +329,12 @@ with tab1:
         _flu["FIN_FLU"] = pd.to_numeric(_flu["FIN_FLU"], errors="coerce")
         _flu = _flu.dropna(subset=["DT_DIGITA", "FIN_FLU"])
         _flu["FIN_FLU"] = _flu["FIN_FLU"].astype(int)
-        _flu = _flu[_flu["FIN_FLU"].isin(FIN_FLU_LABELS)]
-        _flu["FIN_FLU_LABEL"] = _flu["FIN_FLU"].map(FIN_FLU_LABELS)
+        _flu = _flu[_flu["FIN_FLU"].isin([1, 2])]
+        _flu["FIN_SUBT"] = pd.to_numeric(_flu.get("FIN_SUBT"), errors="coerce")
+        _sub_label = _flu["FIN_SUBT"].map(FIN_SUBT_LABELS)
+        # Influenza A → subtype label (or generic "Influenza A"); B → "Influenza B".
+        _flu["FLU_LABEL"] = _sub_label.where(_flu["FIN_FLU"] == 1, "Influenza B")
+        _flu.loc[(_flu["FIN_FLU"] == 1) & _flu["FLU_LABEL"].isna(), "FLU_LABEL"] = "Influenza A"
 
         if _flu.empty:
             st.info("Sem dados de tipo de influenza para os filtros selecionados.")
@@ -289,67 +342,19 @@ with tab1:
             _yr_f, _wk_f = paho_year_week(_flu["DT_DIGITA"])
             _flu["semana"]      = "SE " + _wk_f.astype(str).str.zfill(2) + "/" + _yr_f.astype(str)
             _flu["semana_sort"] = _yr_f * 100 + _wk_f
-            _agg_f = _flu.groupby(["semana", "semana_sort", "FIN_FLU_LABEL"]).size().reset_index(name="n")
+            _agg_f = _flu.groupby(["semana", "semana_sort", "FLU_LABEL"]).size().reset_index(name="n")
             _ord_f = _agg_f[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
+            _present = [l for l in FLU_COMBINED_ORDER if l in _agg_f["FLU_LABEL"].unique()]
             _fig_f = px.bar(
-                _agg_f, x="semana", y="n", color="FIN_FLU_LABEL",
-                color_discrete_map=FIN_FLU_COLORS,
+                _agg_f, x="semana", y="n", color="FLU_LABEL",
+                color_discrete_map=FLU_COMBINED_COLORS,
                 title="Tipo de Influenza por Semana Epidemiológica",
-                labels={"semana": "Semana Epidemiológica", "n": "Nº Casos", "FIN_FLU_LABEL": "Tipo"},
-                category_orders={"semana": _ord_f},
+                labels={"semana": "Semana Epidemiológica", "n": "Nº Casos", "FLU_LABEL": "Tipo / Subtipo"},
+                category_orders={"semana": _ord_f, "FLU_LABEL": _present},
             )
             _add_pct_hover(_fig_f, _agg_f)
             _bar_layout(_fig_f)
             st.plotly_chart(_fig_f, use_container_width=True)
-            st.caption(f"Fonte: {_FONTE_SG}")
-
-    # ---- FIN_SUBT — Influenza subtypes -----------------------------------------
-    st.markdown("---")
-    st.markdown("#### Subtipo de Influenza A")
-
-    FIN_SUBT_LABELS = {
-        1: "Influenza A (H1N1)pdm09",
-        4: "Influenza A não subtipado",
-        6: "Influenza A (H3N2)",
-        7: "Influenza A não subtipável",
-        8: "Inconclusivo",
-    }
-    FIN_SUBT_COLORS = {
-        "Influenza A (H1N1)pdm09":   "#E45756",
-        "Influenza A (H3N2)":         "#F58518",
-        "Influenza A não subtipado":  "#9C9C9C",
-        "Influenza A não subtipável": "#72B7B2",
-        "Inconclusivo":               "#B279A2",
-    }
-
-    if "FIN_SUBT" not in df_filt.columns:
-        st.warning("Coluna FIN_SUBT não encontrada.")
-    else:
-        _sub = df_filt.copy()
-        _sub["FIN_SUBT"] = pd.to_numeric(_sub["FIN_SUBT"], errors="coerce")
-        _sub = _sub.dropna(subset=["DT_DIGITA", "FIN_SUBT"])
-        _sub["FIN_SUBT"] = _sub["FIN_SUBT"].astype(int)
-        _sub = _sub[_sub["FIN_SUBT"].isin(FIN_SUBT_LABELS)]
-        _sub["FIN_SUBT_LABEL"] = _sub["FIN_SUBT"].map(FIN_SUBT_LABELS)
-
-        if _sub.empty:
-            st.info("Sem dados de subtipo para os filtros selecionados.")
-        else:
-            _yr_s, _wk_s = paho_year_week(_sub["DT_DIGITA"])
-            _sub["semana"]      = "SE " + _wk_s.astype(str).str.zfill(2) + "/" + _yr_s.astype(str)
-            _sub["semana_sort"] = _yr_s * 100 + _wk_s
-            _agg_s = _sub.groupby(["semana", "semana_sort", "FIN_SUBT_LABEL"]).size().reset_index(name="n")
-            _ord_s = _agg_s[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
-            _fig_s = px.bar(
-                _agg_s, x="semana", y="n", color="FIN_SUBT_LABEL",
-                color_discrete_map=FIN_SUBT_COLORS,
-                title="Subtipo de Influenza por Semana Epidemiológica",
-                labels={"semana": "Semana Epidemiológica", "n": "Nº Casos", "FIN_SUBT_LABEL": "Subtipo"},
-                category_orders={"semana": _ord_s},
-            )
-            _add_pct_hover(_fig_s, _agg_s)
-            _bar_layout(_fig_s)
-            st.plotly_chart(_fig_s, use_container_width=True)
             st.caption(f"Fonte: {_FONTE_SG}")
 
 
@@ -365,15 +370,14 @@ with tab2:
             "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="sg_test_year",
         )
     with _t2_cu:
-        _t2_unit = st.radio(
-            "Unidade de saúde", ["Todas", "Unidades Municipais"],
-            horizontal=True, key="sg_test_unit",
+        _t2_unit = st.multiselect(
+            "Unidade de saúde", list(_CLINICAS_SG.keys()),
+            default=[], key="sg_test_unit",
+            placeholder="Todas as unidades",
         )
 
     _df_t2 = df_all[df_all["DT_DIGITA"].dt.year.between(_t2_year_lo, _t2_year_hi)].copy()
-    if _t2_unit == "Unidades Municipais":
-        _nm_t2 = _df_t2["NOME_UNIDA"].str.upper().str.strip().fillna("")
-        _df_t2 = _df_t2[_nm_t2.apply(lambda x: any(kw in x for kw in _UNIDADES_KW_SG))].copy()
+    _df_t2 = _filtra_clinicas_sg(_df_t2, _t2_unit)
     if _t2_year_hi == 2026:
         _yr_t2b, _wk_t2b = paho_year_week(_df_t2["DT_DIGITA"])
         _df_t2 = _df_t2[~((_yr_t2b == 2026) & (_wk_t2b > 16))].copy()
