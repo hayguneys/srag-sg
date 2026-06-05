@@ -24,9 +24,9 @@ df_all = df_all[df_all["COD_MUNIC"] == 261160].copy()
 
 _UNIDADES_KW_SG = ["BARROS LIMA", "ARNALDO MARQUES", "AMAURY COUTINHO", "AGAMENON", "CRAVO GAMA"]
 
-_FONTE_SG   = "BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndrome Gripal. Brasília, 2026."
-_FONTE_ESUS = "BRASIL. Ministério da Saúde. eSUS-Notifica. Brasília, 2026."
-_FONTE_PROG = "BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndrome Gripal e Síndromes Respiratórias Agudas Graves. Brasília, 2026."
+_FONTE_SG   = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP"
+_FONTE_ESUS = "SESAU/SEVS/GGAM/GEVEPI/DDT/ESUS"
+_FONTE_PROG = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP"
 
 # Recife total population (IBGE Censo 2022) for incidence rate per 100k
 _RECIFE_POP = 1_640_147
@@ -193,37 +193,26 @@ with tab1:
 
     st.markdown("---")
 
-    # ---- Raça/Cor ------------------------------------------------------------
-    st.markdown("#### Casos por Raça/Cor")
+    # ---- Raça/Cor — Casos Totais ---------------------------------------------
+    st.markdown("#### Casos Totais por Raça/Cor")
 
-    _RACA_LABELS = {1: "Branca", 2: "Preta", 3: "Amarela", 4: "Parda", 5: "Indígena", 9: "Ignorado"}
-    _RACA_COLORS = {
-        "Branca": "#4C78A8", "Parda": "#F58518", "Preta": "#E45756",
-        "Amarela": "#EECA3B", "Indígena": "#54A24B", "Ignorado": "#9C9C9C",
-    }
-
-    _raca = df_filt.copy()
-    _raca["RACA"] = pd.to_numeric(_raca["RACA"], errors="coerce")
-    _raca = _raca.dropna(subset=["DT_DIGITA", "RACA"])
-    _raca["RACA_LABEL"] = _raca["RACA"].astype(int).map(_RACA_LABELS)
-    _raca = _raca.dropna(subset=["RACA_LABEL"])
+    _raca = df_filt.dropna(subset=["DT_DIGITA"]).copy()
 
     if _raca.empty:
-        st.info("Sem dados de raça/cor.")
+        st.info("Sem dados para os filtros selecionados.")
     else:
         _yr_rc, _wk_rc = paho_year_week(_raca["DT_DIGITA"])
         _raca["semana"]      = "SE " + _wk_rc.astype(str).str.zfill(2) + "/" + _yr_rc.astype(str)
         _raca["semana_sort"] = _yr_rc * 100 + _wk_rc
-        _agg_rc = _raca.groupby(["semana", "semana_sort", "RACA_LABEL"]).size().reset_index(name="n")
+        _agg_rc = _raca.groupby(["semana", "semana_sort"]).size().reset_index(name="n")
         _ord_rc = _agg_rc[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
         _fig_rc = px.bar(
-            _agg_rc, x="semana", y="n", color="RACA_LABEL",
-            color_discrete_map=_RACA_COLORS,
-            title="Casos por Raça/Cor por Semana Epidemiológica",
-            labels={"semana": "Semana Epidemiológica", "n": "Nº Casos", "RACA_LABEL": "Raça/Cor"},
+            _agg_rc, x="semana", y="n",
+            color_discrete_sequence=["#4C78A8"],
+            title="Casos Totais por Semana Epidemiológica",
+            labels={"semana": "Semana Epidemiológica", "n": "Nº Casos"},
             category_orders={"semana": _ord_rc},
         )
-        _add_pct_hover(_fig_rc, _agg_rc)
         _bar_layout(_fig_rc)
         st.plotly_chart(_fig_rc, use_container_width=True)
         st.caption(f"Fonte: {_FONTE_SG}")

@@ -23,7 +23,7 @@ df_all = df_all[df_all["ID_MUNICIP"] == "RECIFE"].copy()
 
 _UNIDADES_KW_SRAG = ["BARROS LIMA", "ARNALDO MARQUES", "AMAURY COUTINHO", "AGAMENON"]
 
-_FONTE_SRAG = "BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndromes Respiratórias Agudas Graves. Brasília, 2026."
+_FONTE_SRAG = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP"
 _RECIFE_POP = 1_640_147
 
 if st.session_state.pop("srag_goto_nowcasting", False):
@@ -183,37 +183,26 @@ with tab1:
 
     st.markdown("---")
 
-    # ---- Raça/Cor ------------------------------------------------------------
-    st.markdown("#### Casos por Raça/Cor")
+    # ---- Raça/Cor — Casos Totais ---------------------------------------------
+    st.markdown("#### Casos Totais por Raça/Cor")
 
-    _RACA_LABELS_SR = {1: "Branca", 2: "Preta", 3: "Amarela", 4: "Parda", 5: "Indígena", 9: "Ignorado"}
-    _RACA_COLORS_SR = {
-        "Branca": "#4C78A8", "Parda": "#F58518", "Preta": "#E45756",
-        "Amarela": "#EECA3B", "Indígena": "#54A24B", "Ignorado": "#9C9C9C",
-    }
-
-    _raca_sr = df_filt.copy()
-    _raca_sr["CS_RACA"] = pd.to_numeric(_raca_sr["CS_RACA"], errors="coerce")
-    _raca_sr = _raca_sr.dropna(subset=["DT_DIGITA", "CS_RACA"])
-    _raca_sr["RACA_LABEL"] = _raca_sr["CS_RACA"].astype(int).map(_RACA_LABELS_SR)
-    _raca_sr = _raca_sr.dropna(subset=["RACA_LABEL"])
+    _raca_sr = df_filt.dropna(subset=["DT_DIGITA"]).copy()
 
     if _raca_sr.empty:
-        st.info("Sem dados de raça/cor.")
+        st.info("Sem dados para os filtros selecionados.")
     else:
         _yr_rc, _wk_rc = paho_year_week(_raca_sr["DT_DIGITA"])
         _raca_sr["semana"]      = "SE " + _wk_rc.astype(str).str.zfill(2) + "/" + _yr_rc.astype(str)
         _raca_sr["semana_sort"] = _yr_rc * 100 + _wk_rc
-        _agg_rc = _raca_sr.groupby(["semana", "semana_sort", "RACA_LABEL"]).size().reset_index(name="n")
+        _agg_rc = _raca_sr.groupby(["semana", "semana_sort"]).size().reset_index(name="n")
         _ord_rc = _agg_rc[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
         _fig_rc = px.bar(
-            _agg_rc, x="semana", y="n", color="RACA_LABEL",
-            color_discrete_map=_RACA_COLORS_SR,
-            title="Casos por Raça/Cor por Semana Epidemiológica",
-            labels={"semana": "Semana Epidemiológica", "n": "Nº Casos", "RACA_LABEL": "Raça/Cor"},
+            _agg_rc, x="semana", y="n",
+            color_discrete_sequence=["#4C78A8"],
+            title="Casos Totais por Semana Epidemiológica",
+            labels={"semana": "Semana Epidemiológica", "n": "Nº Casos"},
             category_orders={"semana": _ord_rc},
         )
-        _add_pct_hover(_fig_rc, _agg_rc)
         _bar_layout(_fig_rc)
         st.plotly_chart(_fig_rc, use_container_width=True)
         st.caption(f"Fonte: {_FONTE_SRAG}")
@@ -266,79 +255,6 @@ with tab1:
         _srag_dist_plot = _srag_dist[["distrito", "n", "taxa"]].copy()
         _cmp.html(_folium_choropleth_distritos(_srag_dist_plot, color_col=_srag_map_col), height=520, scrolling=False)
         st.caption(f"Fonte: {_FONTE_SRAG} · Pop. IBGE Censo 2022.")
-
-    st.markdown("---")
-    st.markdown("#### Internações por Faixa Etária")
-
-    AGE_BINS = [
-        ("1–4",   lambda a: (a >= 1)  & (a <= 4)),
-        ("5–9",   lambda a: (a >= 5)  & (a <= 9)),
-        ("10–19", lambda a: (a >= 10) & (a <= 19)),
-        ("20–29", lambda a: (a >= 20) & (a <= 29)),
-        ("30–39", lambda a: (a >= 30) & (a <= 39)),
-        ("40–49", lambda a: (a >= 40) & (a <= 49)),
-        ("50–59", lambda a: (a >= 50) & (a <= 59)),
-        ("60+",   lambda a: a >= 60),
-    ]
-    AGE_COLORS = {
-        "1–4":   "#4C78A8",
-        "5–9":   "#F58518",
-        "10–19": "#E45756",
-        "20–29": "#72B7B2",
-        "30–39": "#54A24B",
-        "40–49": "#EECA3B",
-        "50–59": "#B279A2",
-        "60+":   "#FF9DA6",
-    }
-
-    if "HOSPITAL" not in df_filt.columns:
-        st.warning("Coluna HOSPITAL não encontrada.")
-    else:
-        hosp = df_filt.copy()
-        hosp["HOSPITAL"] = pd.to_numeric(hosp["HOSPITAL"], errors="coerce")
-        hosp["NU_IDADE_N"] = pd.to_numeric(hosp["NU_IDADE_N"], errors="coerce")
-        hosp = hosp[hosp["HOSPITAL"] == 1].dropna(subset=["DT_DIGITA", "NU_IDADE_N"])
-
-        _epi_yr_h, _epi_wk_h = paho_year_week(hosp["DT_DIGITA"])
-        hosp["semana"]      = "SE " + _epi_wk_h.astype(str).str.zfill(2) + "/" + _epi_yr_h.astype(str)
-        hosp["semana_sort"] = _epi_yr_h * 100 + _epi_wk_h
-
-        for label, mask_fn in AGE_BINS:
-            hosp.loc[mask_fn(hosp["NU_IDADE_N"]), "faixa"] = label
-
-        hosp = hosp.dropna(subset=["faixa"])
-
-        if hosp.empty:
-            st.info("Sem internações registradas com os filtros selecionados.")
-        else:
-            agg_h = (
-                hosp.groupby(["semana", "semana_sort", "faixa"])
-                    .size().reset_index(name="n")
-            )
-            semana_order_h = (
-                agg_h[["semana", "semana_sort"]]
-                .drop_duplicates()
-                .sort_values("semana_sort")["semana"]
-                .tolist()
-            )
-            faixa_order = [label for label, _ in AGE_BINS]
-
-            fig_h = px.bar(
-                agg_h, x="semana", y="n", color="faixa",
-                color_discrete_map=AGE_COLORS,
-                title="Internações por Faixa Etária — SRAG",
-                labels={"semana": "Semana Epidemiológica",
-                        "n": "Nº Internações",
-                        "faixa": "Faixa Etária"},
-                category_orders={
-                    "semana": semana_order_h,
-                    "faixa":  faixa_order,
-                },
-            )
-            _add_pct_hover(fig_h, agg_h, unit="internações")
-            _bar_layout(fig_h)
-            st.plotly_chart(fig_h, use_container_width=True)
-            st.caption(f"Fonte: {_FONTE_SRAG}")
 
 # ============================================================
 # TAB 2 — Tipos de Vírus
@@ -642,6 +558,15 @@ with tab4:
     _ob["CLASSI_LABEL"] = _ob["CLASSI_FIN"].map(CLASSI_SRAG)
     _ob["NM_BAIRRO"]    = _ob["NM_BAIRRO"].str.title()
 
+    # ---- Year slider -------------------------------------------------------
+    _ob_year_lo, _ob_year_hi = st.slider(
+        "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="srag_ob_year",
+    )
+    _ob = _ob[_ob["DT_DIGITA"].dt.year.between(_ob_year_lo, _ob_year_hi)].copy()
+    _yr_ob_f, _wk_ob_f = paho_year_week(_ob["DT_DIGITA"])
+    if _ob_year_hi == 2026:
+        _ob = _ob[~((_yr_ob_f == 2026) & (_wk_ob_f > 16))].copy()
+
     # ---- Unidades municipais filter ----------------------------------------
     _UNIDADES_KW = ["BARROS LIMA", "ARNALDO MARQUES", "AMAURY COUTINHO", "AGAMENON"]
     _UNIDADES_DISPLAY = [
@@ -804,7 +729,6 @@ with tab4:
         st.markdown("---")
 
         # ---- Timeline: óbitos por semana epidemiológica --------------------
-        st.markdown("#### Óbitos por Semana Epidemiológica (data do óbito)")
         _ob_tl = _ob.dropna(subset=["DT_EVOLUCA"]).copy()
         _ob_tl = _ob_tl[_ob_tl["DT_EVOLUCA"].dt.year.between(2022, 2026)]
         _yr_tl, _wk_tl = paho_year_week(_ob_tl["DT_EVOLUCA"])
@@ -933,6 +857,8 @@ with tab4:
             _tbl_ob["Data Óbito"] = pd.to_datetime(_tbl_ob["Data Óbito"], errors="coerce").dt.strftime("%d/%m/%Y")
         if "Hospital Internação" in _tbl_ob.columns:
             _tbl_ob["Hospital Internação"] = _tbl_ob["Hospital Internação"].str.title()
+        if "Idade" in _tbl_ob.columns:
+            _tbl_ob["Idade"] = pd.to_numeric(_tbl_ob["Idade"], errors="coerce").astype("Int64")
         st.dataframe(_tbl_ob, use_container_width=True, hide_index=True)
         st.caption(f"Fonte: {_FONTE_SRAG}")
 
