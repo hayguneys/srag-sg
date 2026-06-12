@@ -247,53 +247,6 @@ with tab1:
             st.plotly_chart(_fig_rc, use_container_width=True)
     st.caption(f"Fonte: {_FONTE_SG}")
 
-    st.markdown("---")
-
-    # ---- Mapa de Taxa de Incidência por Distrito Sanitário -------------------
-    st.markdown("#### Taxa de Incidência por Distrito Sanitário (por 100.000 hab.)")
-
-    import streamlit.components.v1 as _cmp
-    from utils.helpers import load_bairro_distrito, _folium_choropleth_distritos, _DISTRITO_NAMES
-
-    @st.cache_data(show_spinner="Calculando incidência por distrito…")
-    def _sg_dist_incidence(year_lo, year_hi, clinicas):
-        _DS_POP = {
-            "DS I": 57466, "DS II": 211471, "DS III": 193372, "DS IV": 234614,
-            "DS V": 263748, "DS VI": 334271, "DS VII": 116463, "DS VIII": 228742,
-        }
-        bairro_ds = load_bairro_distrito()
-        _d = load_sg()
-        _d = _d[_d["COD_MUNIC"] == 261160].copy()
-        _d = _d[_d["DT_DIGITA"].dt.year.between(year_lo, year_hi)].copy()
-        _yr, _wk = paho_year_week(_d["DT_DIGITA"])
-        _d = _d[~((_yr == 2026) & (_wk > 16))]
-        _d = _filtra_clinicas_sg(_d, list(clinicas))
-        if "NOM_BAIRRO" not in _d.columns:
-            return pd.DataFrame()
-        _d["bairro"] = _d["NOM_BAIRRO"].str.upper().str.strip().fillna("")
-        _d = _d[_d["bairro"] != ""]
-        merged = _d.merge(bairro_ds, on="bairro", how="left").dropna(subset=["distrito"])
-        agg = merged.groupby("distrito").size().reset_index(name="n")
-        all_ds = pd.DataFrame({"distrito": list(_DISTRITO_NAMES.values())})
-        result = all_ds.merge(agg, on="distrito", how="left")
-        result["n"]    = result["n"].fillna(0).astype(int)
-        result["pop"]  = result["distrito"].map(_DS_POP)
-        result["taxa"] = (result["n"] / result["pop"] * 100_000).round(1)
-        return result[result["n"] > 0].reset_index(drop=True)
-
-    _sg_map_view = st.radio(
-        "Métrica", ["Taxa de incidência (por 100.000 hab.)", "Números absolutos"],
-        horizontal=True, key="sg_map_metric", label_visibility="collapsed",
-    )
-    _sg_dist = _sg_dist_incidence(_year_lo, _year_hi, tuple(_unit_filter))
-    if _sg_dist.empty:
-        st.info("Sem dados de distrito para os filtros selecionados.")
-    else:
-        _sg_map_col = "taxa" if _sg_map_view.startswith("Taxa") else "n"
-        _sg_dist_plot = _sg_dist[["distrito", "n", "taxa"]].copy()
-        _cmp.html(_folium_choropleth_distritos(_sg_dist_plot, color_col=_sg_map_col), height=520, scrolling=False)
-        st.caption(f"Fonte: {_FONTE_SG} · Pop. IBGE Censo 2022.")
-
     # ---- FIN_FLU — Influenza type (A segmented by FIN_SUBT subtypes) ------------
     st.markdown("---")
     st.markdown("#### Tipo de Influenza ")
