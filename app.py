@@ -25,12 +25,7 @@ def intro():
         - **SG** — Síndrome Gripal · abas: Descritivo · Testes · Nowcasting + Forecasting · Progressão para SRAG
         - **SRAG** — Síndrome Respiratória Aguda Grave · abas: Descritivo (com filtro Casos / Óbitos) · Testes · Nowcasting + Forecasting
         - **Resumo Executivo** — Sumário rápido das informações do painel
-        ---
-        **Vigilância sentinela de Sindrome Gripal(SG)**: tem como objetivo principal identificar os vírus
-        respiratórios circulantes e permitir o monitoramento da demanda de atendimento por ess doença.
-        ---
-        **Vigilância universal de Síndrome Respiratória Aguda Grave(SRAG)**: monitora casos hospitalizados e óbitos
-        com o objetivo de identificar o comportamento da influenza e demais vírus respiratórios.
+
         ---
         **Sobre o nowcasting.** O modelo estima quantos casos *realmente* ocorreram
         em semanas recentes, corrigindo o atraso entre o início dos sintomas e o

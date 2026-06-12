@@ -16,6 +16,11 @@ from utils.helpers import (
 
 st.set_page_config(page_title="SRAG", page_icon="🫁", layout="wide")
 st.title("🫁 SRAG — Síndrome Respiratória Aguda Grave")
+st.caption(
+    "*Vigilância universal de Síndrome Respiratória Aguda Grave (SRAG): monitora "
+    "casos hospitalizados e óbitos com o objetivo de identificar o comportamento da "
+    "influenza e demais vírus respiratórios.*"
+)
 
 # --- Load data — município de residência = Recife (ID_MN_RESI) --------------
 # Time axis throughout the page is DT_SIN_PRI (data dos primeiros sintomas).

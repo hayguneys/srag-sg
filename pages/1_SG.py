@@ -17,6 +17,11 @@ from utils.helpers import (
 
 st.set_page_config(page_title="SG", page_icon="🤧", layout="wide")
 st.title("🤧 SG — Síndrome Gripal")
+st.caption(
+    "*Vigilância sentinela de Síndrome Gripal (SG): tem como objetivo principal "
+    "identificar os vírus respiratórios circulantes e permitir o monitoramento da "
+    "demanda de atendimento por essa doença.*"
+)
 
 # --- Load data — filter to Recife notification municipality (COD_MUNIC) -----
 df_all = load_sg()
