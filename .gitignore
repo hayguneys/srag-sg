@@ -14,6 +14,9 @@ data/ESUS Notifica_2026.csv
 data/geocode_bairros.py
 data/DICIO_*.pdf
 
+# Replaced by data/srag_sintomas.parquet (build_srag_sintomas.py)
+data/sragmain_withna.csv
+
 # Unused intermediate geo artefacts (not referenced by the app)
 data/*.shp
 data/*.shx

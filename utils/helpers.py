@@ -82,13 +82,16 @@ def load_esus() -> pd.DataFrame:
     return df
 
 
-@st.cache_data(show_spinner="Carregando SRAG (with NA)…")
+@st.cache_data(show_spinner="Carregando SRAG…")
 def load_srag_withna() -> pd.DataFrame:
-    path = DATA_DIR / "sragmain_withna.csv"
+    # SIVEP-GRIPE SRAG, município de residência = Recife, série histórica.
+    # Analytic date is DT_SIN_PRI (data dos primeiros sintomas). See
+    # data/build_srag_sintomas.py for how this parquet is produced.
+    path = DATA_DIR / "srag_sintomas.parquet"
     if not path.exists():
         st.error(f"Arquivo não encontrado: {path}")
         st.stop()
-    df = pd.read_csv(path, low_memory=False, encoding="latin-1")
+    df = pd.read_parquet(path)
     for c in ("DT_DIGITA", "DT_SIN_PRI"):
         if c in df.columns:
             df[c] = pd.to_datetime(df[c], errors="coerce")

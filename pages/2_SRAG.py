@@ -17,9 +17,10 @@ from utils.helpers import (
 st.set_page_config(page_title="SRAG", page_icon="🫁", layout="wide")
 st.title("🫁 SRAG — Síndrome Respiratória Aguda Grave")
 
-# --- Load data — filter to Recife notification municipality (ID_MUNICIP) ----
+# --- Load data — município de residência = Recife (ID_MN_RESI) --------------
+# Time axis throughout the page is DT_SIN_PRI (data dos primeiros sintomas).
 df_all = load_srag_withna()
-df_all = df_all[df_all["ID_MUNICIP"] == "RECIFE"].copy()
+df_all = df_all[df_all["ID_MN_RESI"] == "RECIFE"].copy()
 
 # Per-clinic selector: display name -> substring matched against NM_UN_INTE.
 _CLINICAS_SRAG = {
@@ -85,7 +86,7 @@ def _decode_srag(df):
     _d["CLASSI_FIN"] = pd.to_numeric(_d["CLASSI_FIN"], errors="coerce")
     _d["CS_RACA"]    = pd.to_numeric(_d["CS_RACA"],    errors="coerce")
     _d["DT_EVOLUCA"] = pd.to_datetime(_d["DT_EVOLUCA"], dayfirst=True, errors="coerce")
-    _d["DT_DIGITA"]  = pd.to_datetime(_d["DT_DIGITA"],  errors="coerce")
+    _d["DT_SIN_PRI"]  = pd.to_datetime(_d["DT_SIN_PRI"],  errors="coerce")
     _d["SEXO_LABEL"]   = _d["CS_SEXO"].map({"M": "Masculino", "F": "Feminino", "I": "Ignorado"})
     _d["RACA_LABEL"]   = _d["CS_RACA"].map(_SRAG_RACA_LABELS)
     _d["CLASSI_LABEL"] = _d["CLASSI_FIN"].map(_SRAG_CLASSI)
@@ -382,9 +383,9 @@ with tab1:
             horizontal=True, key="srag_desc_evolucao",
         )
 
-    df_filt = df_all[df_all["DT_DIGITA"].dt.year.between(_year_lo, _year_hi)].copy()
+    df_filt = df_all[df_all["DT_SIN_PRI"].dt.year.between(_year_lo, _year_hi)].copy()
     df_filt = _filtra_clinicas_srag(df_filt, _unit_filter)
-    _yr_f, _wk_f = paho_year_week(df_filt["DT_DIGITA"])
+    _yr_f, _wk_f = paho_year_week(df_filt["DT_SIN_PRI"])
     if _year_hi == 2026:
         df_filt = df_filt[~((_yr_f == 2026) & (_wk_f > 16))]
 
@@ -501,7 +502,7 @@ with tab1:
 
     _age = df_view.copy()
     _age["NU_IDADE_N"] = pd.to_numeric(_age["NU_IDADE_N"], errors="coerce")
-    _age = _age.dropna(subset=["DT_DIGITA", "NU_IDADE_N"])
+    _age = _age.dropna(subset=["DT_SIN_PRI", "NU_IDADE_N"])
     for _label, _mask in FAIXA_BINS:
         _age.loc[_mask(_age["NU_IDADE_N"]), "faixa"] = _label
     _age = _age.dropna(subset=["faixa"])
@@ -510,7 +511,7 @@ with tab1:
         if _age.empty:
             st.info("Sem dados de faixa etária.")
         else:
-            _yr_a, _wk_a = paho_year_week(_age["DT_DIGITA"])
+            _yr_a, _wk_a = paho_year_week(_age["DT_SIN_PRI"])
             _age["semana"]      = "SE " + _wk_a.astype(str).str.zfill(2) + "/" + _yr_a.astype(str)
             _age["semana_sort"] = _yr_a * 100 + _wk_a
             _agg_a = _age.groupby(["semana", "semana_sort", "faixa"]).size().reset_index(name="n")
@@ -527,12 +528,12 @@ with tab1:
             st.plotly_chart(_fig_a, use_container_width=True)
     elif _faixa_view == "Sexo":
         _sx = df_view.copy()
-        _sx = _sx[_sx["CS_SEXO"].isin(["M", "F"])].dropna(subset=["DT_DIGITA"])
+        _sx = _sx[_sx["CS_SEXO"].isin(["M", "F"])].dropna(subset=["DT_SIN_PRI"])
         _sx["SEXO_LABEL"] = _sx["CS_SEXO"].map({"M": "Masculino", "F": "Feminino"})
         if _sx.empty:
             st.info("Sem dados de sexo.")
         else:
-            _yr_sx, _wk_sx = paho_year_week(_sx["DT_DIGITA"])
+            _yr_sx, _wk_sx = paho_year_week(_sx["DT_SIN_PRI"])
             _sx["semana"]      = "SE " + _wk_sx.astype(str).str.zfill(2) + "/" + _yr_sx.astype(str)
             _sx["semana_sort"] = _yr_sx * 100 + _wk_sx
             _agg_sx = _sx.groupby(["semana", "semana_sort", "SEXO_LABEL"]).size().reset_index(name="n")
@@ -548,13 +549,13 @@ with tab1:
             _bar_layout(_fig_sx)
             st.plotly_chart(_fig_sx, use_container_width=True)
     else:  # Raça/Cor
-        _rc = df_view.dropna(subset=["DT_DIGITA"]).copy()
+        _rc = df_view.dropna(subset=["DT_SIN_PRI"]).copy()
         _rc["RACA_LABEL"] = pd.to_numeric(_rc["CS_RACA"], errors="coerce").map(_SRAG_RACA_LABELS)
         _rc = _rc.dropna(subset=["RACA_LABEL"])
         if _rc.empty:
             st.info("Sem dados de raça/cor.")
         else:
-            _yr_rc, _wk_rc = paho_year_week(_rc["DT_DIGITA"])
+            _yr_rc, _wk_rc = paho_year_week(_rc["DT_SIN_PRI"])
             _rc["semana"]      = "SE " + _wk_rc.astype(str).str.zfill(2) + "/" + _yr_rc.astype(str)
             _rc["semana_sort"] = _yr_rc * 100 + _wk_rc
             _agg_rc = _rc.groupby(["semana", "semana_sort", "RACA_LABEL"]).size().reset_index(name="n")
@@ -591,9 +592,9 @@ with tab1:
         }
         bairro_ds = load_bairro_distrito()
         _d = load_srag_withna()
-        _d = _d[_d["ID_MUNICIP"] == "RECIFE"].copy()
-        _d = _d[_d["DT_DIGITA"].dt.year.between(year_lo, year_hi)].copy()
-        _yr, _wk = paho_year_week(_d["DT_DIGITA"])
+        _d = _d[_d["ID_MN_RESI"] == "RECIFE"].copy()
+        _d = _d[_d["DT_SIN_PRI"].dt.year.between(year_lo, year_hi)].copy()
+        _yr, _wk = paho_year_week(_d["DT_SIN_PRI"])
         _d = _d[~((_yr == 2026) & (_wk > 16))]
         if obitos:
             _d = _d[pd.to_numeric(_d["EVOLUCAO"], errors="coerce") == 2].copy()
@@ -695,10 +696,10 @@ with tab2:
         "Rinovírus":      "#BAB0AC",
     }
 
-    _vbase = df_all[df_all["DT_DIGITA"].dt.year.between(_t2_year_lo, _t2_year_hi)].copy()
+    _vbase = df_all[df_all["DT_SIN_PRI"].dt.year.between(_t2_year_lo, _t2_year_hi)].copy()
     _vbase = _filtra_clinicas_srag(_vbase, _t2_unit)
     if _t2_year_hi == 2026:
-        _yr_vb, _wk_vb = paho_year_week(_vbase["DT_DIGITA"])
+        _yr_vb, _wk_vb = paho_year_week(_vbase["DT_SIN_PRI"])
         _vbase = _vbase[~((_yr_vb == 2026) & (_wk_vb > 16))]
 
     # ---- Total de Testes (Antigeno + PCR) -----------------------------------
@@ -721,33 +722,33 @@ with tab2:
         for _pc in ["POS_PCROUT", "POS_PCRFLU"]:
             if _pc not in _vbase.columns:
                 continue
-            _tmp = _vbase[["DT_DIGITA", _pc]].copy()
+            _tmp = _vbase[["DT_SIN_PRI", _pc]].copy()
             _tmp[_pc] = pd.to_numeric(_tmp[_pc], errors="coerce")
-            _ttested_rows.append(_tmp[_tmp[_pc].notna()][["DT_DIGITA"]].copy())
-            _tpos_rows.append(_tmp[_tmp[_pc] == 1][["DT_DIGITA"]].copy())
+            _ttested_rows.append(_tmp[_tmp[_pc].notna()][["DT_SIN_PRI"]].copy())
+            _tpos_rows.append(_tmp[_tmp[_pc] == 1][["DT_SIN_PRI"]].copy())
 
     if _total_view in ("Antígeno", "Total"):
         # AN_* columns: value in {1,2,3} = tested, value == 1 = positive
         for _col in VIRUS_COLS:
             if _col not in _vbase.columns:
                 continue
-            _tmp = _vbase[["DT_DIGITA", _col]].copy()
+            _tmp = _vbase[["DT_SIN_PRI", _col]].copy()
             _tmp[_col] = pd.to_numeric(_tmp[_col], errors="coerce")
-            _ttested_rows.append(_tmp[_tmp[_col].isin([1, 2, 3])][["DT_DIGITA"]].copy())
-            _tpos_rows.append(_tmp[_tmp[_col] == 1][["DT_DIGITA"]].copy())
+            _ttested_rows.append(_tmp[_tmp[_col].isin([1, 2, 3])][["DT_SIN_PRI"]].copy())
+            _tpos_rows.append(_tmp[_tmp[_col] == 1][["DT_SIN_PRI"]].copy())
 
     if not _ttested_rows:
         st.info("Colunas de teste não encontradas.")
     else:
-        _tall = pd.concat(_ttested_rows, ignore_index=True).dropna(subset=["DT_DIGITA"])
-        _pall = pd.concat(_tpos_rows,    ignore_index=True).dropna(subset=["DT_DIGITA"])
+        _tall = pd.concat(_ttested_rows, ignore_index=True).dropna(subset=["DT_SIN_PRI"])
+        _pall = pd.concat(_tpos_rows,    ignore_index=True).dropna(subset=["DT_SIN_PRI"])
 
-        _yr_tt, _wk_tt = paho_year_week(_tall["DT_DIGITA"])
+        _yr_tt, _wk_tt = paho_year_week(_tall["DT_SIN_PRI"])
         _tall["semana"]      = "SE " + _wk_tt.astype(str).str.zfill(2) + "/" + _yr_tt.astype(str)
         _tall["semana_sort"] = _yr_tt * 100 + _wk_tt
         _tested_wk = _tall.groupby(["semana", "semana_sort"]).size().reset_index(name="total_tested")
 
-        _yr_tp, _wk_tp = paho_year_week(_pall["DT_DIGITA"])
+        _yr_tp, _wk_tp = paho_year_week(_pall["DT_SIN_PRI"])
         _pall["semana"]      = "SE " + _wk_tp.astype(str).str.zfill(2) + "/" + _yr_tp.astype(str)
         _pall["semana_sort"] = _yr_tp * 100 + _wk_tp
         _pos_wk = _pall.groupby(["semana", "semana_sort"]).size().reset_index(name="total_pos")
@@ -811,23 +812,23 @@ with tab2:
 
     st.markdown("---")
     st.markdown("### Teste Antigênico — Positividade por Tipo de Vírus")
-    st.caption("Conta testes positivos  por vírus por semana de digitação (2022–2026).")
+    st.caption("Conta testes positivos por vírus por semana de início dos sintomas (2022–2026).")
 
     _vrows = []
     for _col, _label in VIRUS_COLS.items():
         if _col not in _vbase.columns:
             continue
-        _tmp = _vbase[["DT_DIGITA", _col]].copy()
+        _tmp = _vbase[["DT_SIN_PRI", _col]].copy()
         _tmp[_col] = pd.to_numeric(_tmp[_col], errors="coerce")
-        _pos = _tmp[_tmp[_col] == 1][["DT_DIGITA"]].copy()
+        _pos = _tmp[_tmp[_col] == 1][["DT_SIN_PRI"]].copy()
         _pos["virus"] = _label
         _vrows.append(_pos)
 
     if not _vrows:
         st.info("Nenhuma coluna de teste antigênico encontrada.")
     else:
-        _vlong = pd.concat(_vrows, ignore_index=True).dropna(subset=["DT_DIGITA"])
-        _yr_v, _wk_v = paho_year_week(_vlong["DT_DIGITA"])
+        _vlong = pd.concat(_vrows, ignore_index=True).dropna(subset=["DT_SIN_PRI"])
+        _yr_v, _wk_v = paho_year_week(_vlong["DT_SIN_PRI"])
         _vlong["semana"]      = "SE " + _wk_v.astype(str).str.zfill(2) + "/" + _yr_v.astype(str)
         _vlong["semana_sort"] = _yr_v * 100 + _wk_v
         _agg_v = _vlong.groupby(["semana", "semana_sort", "virus"]).size().reset_index(name="n")
@@ -846,23 +847,23 @@ with tab2:
 
     st.markdown("---")
     st.markdown("### PCR — Positividade por Tipo de Vírus")
-    st.caption("Conta testes PCR positivos por vírus por semana de digitação (2022–2026).")
+    st.caption("Conta testes PCR positivos por vírus por semana de início dos sintomas (2022–2026).")
 
     _prows = []
     for _col, _label in PCR_COLS.items():
         if _col not in _vbase.columns:
             continue
-        _tmp = _vbase[["DT_DIGITA", _col]].copy()
+        _tmp = _vbase[["DT_SIN_PRI", _col]].copy()
         _tmp[_col] = pd.to_numeric(_tmp[_col], errors="coerce")
-        _pos = _tmp[_tmp[_col] == 1][["DT_DIGITA"]].copy()
+        _pos = _tmp[_tmp[_col] == 1][["DT_SIN_PRI"]].copy()
         _pos["virus"] = _label
         _prows.append(_pos)
 
     if not _prows:
         st.info("Nenhuma coluna de PCR encontrada.")
     else:
-        _plong = pd.concat(_prows, ignore_index=True).dropna(subset=["DT_DIGITA"])
-        _yr_p, _wk_p = paho_year_week(_plong["DT_DIGITA"])
+        _plong = pd.concat(_prows, ignore_index=True).dropna(subset=["DT_SIN_PRI"])
+        _yr_p, _wk_p = paho_year_week(_plong["DT_SIN_PRI"])
         _plong["semana"]      = "SE " + _wk_p.astype(str).str.zfill(2) + "/" + _yr_p.astype(str)
         _plong["semana_sort"] = _yr_p * 100 + _wk_p
         _agg_p = _plong.groupby(["semana", "semana_sort", "virus"]).size().reset_index(name="n")

@@ -98,11 +98,11 @@ def _build_distrito_data():
     else:
         sg_agg = pd.DataFrame(columns=["distrito", "sg"])
 
-    # --- SRAG -------------------------------------------------------------
+    # --- SRAG (município de residência = Recife, data dos primeiros sintomas) --
     _sr = load_srag_withna()
-    _sr = _sr[_sr["ID_MUNICIP"] == "RECIFE"].copy()
-    _sr = _sr[_sr["DT_DIGITA"].dt.year.between(2022, 2026)].copy()
-    _yr2, _wk2 = paho_year_week(_sr["DT_DIGITA"])
+    _sr = _sr[_sr["ID_MN_RESI"] == "RECIFE"].copy()
+    _sr = _sr[_sr["DT_SIN_PRI"].dt.year.between(2022, 2026)].copy()
+    _yr2, _wk2 = paho_year_week(_sr["DT_SIN_PRI"])
     _sr = _sr[~((_yr2 == 2026) & (_wk2 > 16))]
     if "NM_BAIRRO" in _sr.columns:
         _sr["bairro"] = _sr["NM_BAIRRO"].str.upper().str.strip().fillna("")
