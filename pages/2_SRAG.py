@@ -37,15 +37,67 @@ _CLINICAS_SRAG = {
 }
 
 
+# Unidade de internação dropdown: preset shortcuts + a "Unidades municipais"
+# section header, followed by the individual municipal clinics. Streamlit's
+# multiselect has no native option groups, so the header is a decorative (no-op)
+# option and the presets are resolved in _filtra_clinicas_srag.
+_UNI_TODAS  = "__todas__"
+_UNI_MUNI   = "__municipais__"
+_UNI_EXMUNI = "__exceto_municipais__"
+_UNI_DIV    = "__sec_municipais__"
+_UNI_LABELS = {
+    _UNI_TODAS:  "Todas as unidades",
+    _UNI_MUNI:   "Todas as municipais",
+    _UNI_EXMUNI: "Todas exceto municipais",
+    _UNI_DIV:    "──────  Unidades municipais  ──────",
+}
+_UNI_OPTIONS = [_UNI_TODAS, _UNI_MUNI, _UNI_EXMUNI, _UNI_DIV] + list(_CLINICAS_SRAG.keys())
+
+
+def _uni_label(opt):
+    return _UNI_LABELS.get(opt, opt)
+
+
+def _unidade_multiselect_srag(key):
+    """Render the Unidade de internação selector with presets + municipal section."""
+    return st.multiselect(
+        "Unidade de internação", _UNI_OPTIONS,
+        default=[], key=key, format_func=_uni_label,
+        placeholder="Todas as unidades",
+    )
+
+
 def _filtra_clinicas_srag(df, selecionadas):
-    """Keep rows whose NM_UN_INTE matches any selected clinic. Empty = todas."""
-    if not selecionadas or "NM_UN_INTE" not in df.columns:
+    """Resolve the unidade selection (presets + clinics) into a row filter.
+
+    Empty, "Todas as unidades", or only the section header => no filtering.
+    """
+    if "NM_UN_INTE" not in df.columns:
         return df
-    _kw = [_CLINICAS_SRAG[c] for c in selecionadas if c in _CLINICAS_SRAG]
-    if not _kw:
+    sel = [s for s in (selecionadas or []) if s != _UNI_DIV]
+    if not sel or _UNI_TODAS in sel:
         return df
+
     _nm = df["NM_UN_INTE"].str.upper().str.strip().fillna("")
-    return df[_nm.apply(lambda x: any(k in x for k in _kw))].copy()
+    _muni_kw = list(_CLINICAS_SRAG.values())
+    is_muni = _nm.apply(lambda x: any(k in x for k in _muni_kw))
+
+    mask = pd.Series(False, index=df.index)
+    matched = False
+    if _UNI_MUNI in sel:
+        mask = mask | is_muni
+        matched = True
+    if _UNI_EXMUNI in sel:
+        mask = mask | (~is_muni)
+        matched = True
+    _indiv_kw = [_CLINICAS_SRAG[c] for c in sel if c in _CLINICAS_SRAG]
+    if _indiv_kw:
+        mask = mask | _nm.apply(lambda x: any(k in x for k in _indiv_kw))
+        matched = True
+
+    if not matched:
+        return df
+    return df[mask].copy()
 
 
 _FONTE_SRAG = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP"
@@ -377,11 +429,7 @@ with tab1:
             "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="srag_desc_year",
         )
     with _c_unit:
-        _unit_filter = st.multiselect(
-            "Unidade de internação", list(_CLINICAS_SRAG.keys()),
-            default=[], key="srag_desc_unit",
-            placeholder="Todas as unidades",
-        )
+        _unit_filter = _unidade_multiselect_srag("srag_desc_unit")
     with _c_evo:
         _evo_filter = st.radio(
             "Evolução", ["Casos", "Óbitos"],
@@ -652,11 +700,7 @@ with tab2:
             "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="srag_test_year",
         )
     with _t2_cu:
-        _t2_unit = st.multiselect(
-            "Unidade de internação", list(_CLINICAS_SRAG.keys()),
-            default=[], key="srag_test_unit",
-            placeholder="Todas as unidades",
-        )
+        _t2_unit = _unidade_multiselect_srag("srag_test_unit")
 
     VIRUS_COLS = {
         "AN_PARA1": "Parainfluenza 1",
