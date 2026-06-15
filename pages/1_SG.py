@@ -153,14 +153,34 @@ with tab1:
     if _year_hi == 2026:
         df_filt = df_filt[~((_yr_f == 2026) & (_wk_f > 16))]
 
-    # ---- KPIs --------------------------------------------------------------
+    # ---- KPIs with delta (previous period) -----------------------------------
+    def _calc_delta(current, previous):
+        if previous == 0:
+            return None
+        delta = ((current - previous) / previous * 100)
+        return f"{delta:+.0f}"
+
     total_cases = len(df_filt)
     vac_flu  = int((df_filt["VACINA"] == 1).sum())      if "VACINA"     in df_filt.columns else 0
 
-    render_kpis([
-        ("Total de casos",       fmt_int(total_cases)),
-        ("Vacinação Influenza",  fmt_int(vac_flu)),
-    ])
+    # Previous period (year_lo-1 to year_hi-1)
+    df_prev = df_all[df_all["DT_PRISINT"].dt.year.between(_year_lo - 1, _year_hi - 1)].copy()
+    df_prev = _filtra_clinicas_sg(df_prev, _unit_filter)
+    _yr_prev, _wk_prev = paho_year_week(df_prev["DT_PRISINT"])
+    if _year_hi - 1 == 2026:
+        df_prev = df_prev[~((_yr_prev == 2026) & (_wk_prev > 16))]
+
+    total_cases_prev = len(df_prev)
+    vac_flu_prev = int((df_prev["VACINA"] == 1).sum()) if "VACINA" in df_prev.columns else 0
+
+    delta_total = _calc_delta(total_cases, total_cases_prev)
+    delta_vac = _calc_delta(vac_flu, vac_flu_prev)
+
+    kpis = [
+        ("Total de casos", fmt_int(total_cases), delta_total) if delta_total else ("Total de casos", fmt_int(total_cases)),
+        ("Vacinação Influenza", fmt_int(vac_flu), delta_vac) if delta_vac else ("Vacinação Influenza", fmt_int(vac_flu)),
+    ]
+    render_kpis(kpis)
 
     st.markdown("---")
 

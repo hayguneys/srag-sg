@@ -443,7 +443,20 @@ with tab1:
     if _year_hi == 2026:
         df_filt = df_filt[~((_yr_f == 2026) & (_wk_f > 16))]
 
+    # Previous period for delta calculation
+    df_prev = df_all[df_all["DT_SIN_PRI"].dt.year.between(_year_lo - 1, _year_hi - 1)].copy()
+    df_prev = _filtra_clinicas_srag(df_prev, _unit_filter)
+    _yr_prev, _wk_prev = paho_year_week(df_prev["DT_SIN_PRI"])
+    if _year_hi - 1 == 2026:
+        df_prev = df_prev[~((_yr_prev == 2026) & (_wk_prev > 16))]
+
     _show_obitos = _evo_filter == "Óbitos"
+
+    def _calc_delta(current, previous):
+        if previous == 0:
+            return None
+        delta = ((current - previous) / previous * 100)
+        return f"{delta:+.0f}"
 
     def _bar_layout(fig):
         fig.update_layout(
@@ -470,7 +483,7 @@ with tab1:
                 "<extra></extra>"
             )
 
-    # ---- KPIs --------------------------------------------------------------
+    # ---- KPIs with delta (previous period) -----------------------------------
     if _show_obitos:
         _kpi_base = df_filt[pd.to_numeric(df_filt["EVOLUCAO"], errors="coerce") == 2].copy()
         _kpi_base["NU_IDADE_N"] = pd.to_numeric(_kpi_base["NU_IDADE_N"], errors="coerce")
@@ -481,20 +494,40 @@ with tab1:
             (_kpi_base["UTI"] == 1).sum() / _kpi_base["UTI"].notna().sum() * 100
             if "UTI" in _kpi_base.columns and _kpi_base["UTI"].notna().sum() > 0 else 0
         )
-        render_kpis([
-            ("Total de óbitos",   fmt_int(len(_kpi_base))),
-            ("Feminino",          fmt_int(_n_fem)),
-            ("Masculino",         fmt_int(_n_masc)),
-            ("Idade média",       f"{_avg_age:.1f} anos"),
+
+        # Previous period
+        _kpi_prev = df_prev[pd.to_numeric(df_prev["EVOLUCAO"], errors="coerce") == 2].copy()
+        _n_fem_prev = (_kpi_prev["CS_SEXO"] == "F").sum()
+        _n_masc_prev = (_kpi_prev["CS_SEXO"] == "M").sum()
+
+        delta_total = _calc_delta(len(_kpi_base), len(_kpi_prev))
+        delta_fem = _calc_delta(_n_fem, _n_fem_prev)
+        delta_masc = _calc_delta(_n_masc, _n_masc_prev)
+
+        kpis = [
+            ("Total de óbitos", fmt_int(len(_kpi_base)), delta_total) if delta_total else ("Total de óbitos", fmt_int(len(_kpi_base))),
+            ("Feminino", fmt_int(_n_fem), delta_fem) if delta_fem else ("Feminino", fmt_int(_n_fem)),
+            ("Masculino", fmt_int(_n_masc), delta_masc) if delta_masc else ("Masculino", fmt_int(_n_masc)),
+            ("Idade média", f"{_avg_age:.1f} anos"),
             ("Internados em UTI", f"{_uti_pct:.1f}%"),
-        ])
+        ]
+        render_kpis(kpis)
     else:
         total_cases  = len(df_filt)
         total_deaths = int((df_filt["EVOLUCAO"] == 2).sum()) if "EVOLUCAO" in df_filt.columns else 0
-        render_kpis([
-            ("Total de casos",  fmt_int(total_cases)),
-            ("Total de óbitos", fmt_int(total_deaths)),
-        ])
+
+        # Previous period
+        total_cases_prev = len(df_prev)
+        total_deaths_prev = int((df_prev["EVOLUCAO"] == 2).sum()) if "EVOLUCAO" in df_prev.columns else 0
+
+        delta_cases = _calc_delta(total_cases, total_cases_prev)
+        delta_deaths = _calc_delta(total_deaths, total_deaths_prev)
+
+        kpis = [
+            ("Total de casos", fmt_int(total_cases), delta_cases) if delta_cases else ("Total de casos", fmt_int(total_cases)),
+            ("Total de óbitos", fmt_int(total_deaths), delta_deaths) if delta_deaths else ("Total de óbitos", fmt_int(total_deaths)),
+        ]
+        render_kpis(kpis)
 
     st.markdown("---")
 

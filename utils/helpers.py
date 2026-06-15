@@ -146,12 +146,20 @@ def inject_test_frames() -> None:
 
 
 # --- KPI rendering -------------------------------------------------------
-def render_kpis(kpis: list[tuple[str, str]]) -> None:
-    """Render a row of KPI cards. Each kpi is (label, value)."""
+def render_kpis(kpis: list[tuple[str, str] | tuple[str, str, str]]) -> None:
+    """Render a row of KPI cards. Each kpi is (label, value) or (label, value, delta).
+
+    Delta is formatted as "| <delta>%" when provided.
+    """
     cols = st.columns(len(kpis))
-    for col, (label, value) in zip(cols, kpis):
+    for col, kpi in zip(cols, kpis):
         with col:
-            st.metric(label, value)
+            if len(kpi) == 3:
+                label, value, delta = kpi
+                st.metric(label, f"{value} | {delta}%")
+            else:
+                label, value = kpi
+                st.metric(label, value)
 
 
 def fmt_int(n) -> str:
