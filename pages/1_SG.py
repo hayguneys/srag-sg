@@ -251,7 +251,7 @@ with tab1:
                 color_discrete_map={"Feminino": "#E45756", "Masculino": "#4C78A8"},
             )
             _fig_sum_sx.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
-            st.plotly_chart(_fig_sum_sx, use_container_width=True)
+            st.plotly_chart(_fig_sum_sx, width='stretch')
 
     with _rc2:
         _sum_age = df_filt.copy()
@@ -275,7 +275,7 @@ with tab1:
                 category_orders={"faixa": _sum_age_order},
             )
             _fig_sum_age.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
-            st.plotly_chart(_fig_sum_age, use_container_width=True)
+            st.plotly_chart(_fig_sum_age, width='stretch')
 
     with _rc3:
         _sum_bairro = (
@@ -298,7 +298,7 @@ with tab1:
                 margin=dict(l=10, r=10, t=10, b=10), height=_bairro_h,
             )
             with st.container(height=300, border=False):
-                st.plotly_chart(_fig_sum_bairro, use_container_width=True)
+                st.plotly_chart(_fig_sum_bairro, width='stretch')
 
     st.caption(f"Fonte: {_FONTE_SG}")
 
@@ -336,7 +336,7 @@ with tab1:
             )
             _add_pct_hover(_fig_a, _agg_a)
             _bar_layout(_fig_a)
-            st.plotly_chart(_fig_a, use_container_width=True)
+            st.plotly_chart(_fig_a, width='stretch')
     elif _faixa_view == "Sexo":
         _sx = df_filt.dropna(subset=["DT_PRISINT"]).copy()
         _sx["SEXO"] = pd.to_numeric(_sx["SEXO"], errors="coerce")
@@ -359,7 +359,7 @@ with tab1:
             )
             _add_pct_hover(_fig_sx, _agg_sx)
             _bar_layout(_fig_sx)
-            st.plotly_chart(_fig_sx, use_container_width=True)
+            st.plotly_chart(_fig_sx, width='stretch')
     else:  # Raça/Cor
         _rc = df_filt.dropna(subset=["DT_PRISINT"]).copy()
         _rc["RACA_LABEL"] = pd.to_numeric(_rc["RACA"], errors="coerce").map(_SG_RACA_LABELS)
@@ -381,7 +381,7 @@ with tab1:
             )
             _add_pct_hover(_fig_rc, _agg_rc)
             _bar_layout(_fig_rc)
-            st.plotly_chart(_fig_rc, use_container_width=True)
+            st.plotly_chart(_fig_rc, width='stretch')
     st.caption(f"Fonte: {_FONTE_SG}")
 
     # ---- FIN_FLU — Influenza type (A segmented by FIN_SUBT subtypes) ------------
@@ -449,7 +449,7 @@ with tab1:
             )
             _add_pct_hover(_fig_f, _agg_f)
             _bar_layout(_fig_f)
-            st.plotly_chart(_fig_f, use_container_width=True)
+            st.plotly_chart(_fig_f, width='stretch')
             st.caption(f"Fonte: {_FONTE_SG}")
 
 
@@ -552,7 +552,7 @@ with tab2:
             height=580,
             plot_bgcolor="white",
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
     # ---- Total (IFI + PCR) ----------------------------------------
     st.markdown("### Total de Testes e Taxa de Positividade")
@@ -653,7 +653,7 @@ with tab2:
             height=580,
             plot_bgcolor="white",
         )
-        st.plotly_chart(_fig_tot_sg, use_container_width=True)
+        st.plotly_chart(_fig_tot_sg, width='stretch')
         st.caption(f"Fonte: {_FONTE_SG}")
 
     st.markdown("---")
@@ -795,7 +795,7 @@ with tab2:
             height=600,
             plot_bgcolor="white",
         )
-        st.plotly_chart(_fig_e, use_container_width=True)
+        st.plotly_chart(_fig_e, width='stretch')
         st.caption(f"Fonte: {_FONTE_ESUS}")
 
 # ============================================================
@@ -870,7 +870,7 @@ with tab4:
                 color_discrete_map={"Feminino": "#E45756", "Masculino": "#4C78A8"},
             )
             _fig_sx.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
-            st.plotly_chart(_fig_sx, use_container_width=True)
+            st.plotly_chart(_fig_sx, width='stretch')
 
         with _c2:
             _PROG_FAIXA_BINS = [
@@ -897,7 +897,7 @@ with tab4:
                 category_orders={"faixa": _PROG_FAIXA_ORDER},
             )
             _fig_age_p.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
-            st.plotly_chart(_fig_age_p, use_container_width=True)
+            st.plotly_chart(_fig_age_p, width='stretch')
 
         with _c3:
             _bairro_p = (
@@ -915,7 +915,7 @@ with tab4:
                     yaxis=dict(autorange="reversed"),
                     margin=dict(l=10, r=10, t=50, b=10), height=320,
                 )
-                st.plotly_chart(_fig_bairro_p, use_container_width=True)
+                st.plotly_chart(_fig_bairro_p, width='stretch')
 
         with _c4:
             if "srag_evolucao_label" in _prog.columns:
@@ -930,7 +930,7 @@ with tab4:
                     },
                 )
                 _fig_ev.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
-                st.plotly_chart(_fig_ev, use_container_width=True)
+                st.plotly_chart(_fig_ev, width='stretch')
 
         st.caption(f"Fonte: {_FONTE_PROG}")
 
@@ -949,7 +949,7 @@ with tab4:
                 category_orders={"intervalo": _gap_order},
             )
             _fig_gap.update_layout(margin=dict(l=20, r=20, t=50, b=60), height=340, plot_bgcolor="white")
-            st.plotly_chart(_fig_gap, use_container_width=True)
+            st.plotly_chart(_fig_gap, width='stretch')
             st.caption(f"Fonte: {_FONTE_PROG}")
 
         st.markdown("---")
@@ -980,5 +980,5 @@ with tab4:
             _tbl_p["Bairro"] = _tbl_p["Bairro"].str.title()
         if "Hospital (SRAG)" in _tbl_p.columns:
             _tbl_p["Hospital (SRAG)"] = _tbl_p["Hospital (SRAG)"].str.title()
-        st.dataframe(_tbl_p, use_container_width=True, hide_index=True)
+        st.dataframe(_tbl_p, width='stretch', hide_index=True)
         st.caption(f"Fonte: {_FONTE_PROG}")

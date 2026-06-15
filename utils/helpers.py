@@ -273,7 +273,7 @@ def render_ma_chart(
         height=520,
         plot_bgcolor="white",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 # --- Nowcasting / Forecasting table from htmlwidgets HTML ----------------
@@ -395,7 +395,7 @@ def render_forecast_table(filename: str, caption: bool = True) -> None:
             "Estimativa de casos (mediana) e intervalo de credibilidade de 95% "
             "para as semanas projetadas pelo modelo."
         )
-    st.dataframe(show, use_container_width=True, hide_index=True)
+    st.dataframe(show, width='stretch', hide_index=True)
 
 
 # --- Choropleth map (distritos sanitários) — Leaflet / folium -----------

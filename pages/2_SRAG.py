@@ -177,7 +177,7 @@ def _render_srag_summary_grid(df_view, unidade):
             hole=0.45,
         )
         _fig_s.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
-        st.plotly_chart(_fig_s, use_container_width=True)
+        st.plotly_chart(_fig_s, width='stretch')
 
     with _r1b:
         _faixa_order = [l for l, _ in _SRAG_FAIXA_BINS]
@@ -198,7 +198,7 @@ def _render_srag_summary_grid(df_view, unidade):
             category_orders={"faixa": _faixa_order},
         )
         _fig_age.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
-        st.plotly_chart(_fig_age, use_container_width=True)
+        st.plotly_chart(_fig_age, width='stretch')
 
     with _r1c:
         _rc = _ob["RACA_LABEL"].value_counts().reset_index()
@@ -212,7 +212,7 @@ def _render_srag_summary_grid(df_view, unidade):
             yaxis=dict(autorange="reversed"),
             margin=dict(l=10, r=10, t=50, b=10), height=320,
         )
-        st.plotly_chart(_fig_rc, use_container_width=True)
+        st.plotly_chart(_fig_rc, width='stretch')
 
     with _r1d:
         _bc = _ob["NM_BAIRRO"].value_counts().head(10).reset_index()
@@ -226,7 +226,7 @@ def _render_srag_summary_grid(df_view, unidade):
             yaxis=dict(autorange="reversed"),
             margin=dict(l=10, r=10, t=50, b=10), height=320,
         )
-        st.plotly_chart(_fig_bairro, use_container_width=True)
+        st.plotly_chart(_fig_bairro, width='stretch')
     st.caption(f"Fonte: {_FONTE_SRAG}")
 
 
@@ -260,7 +260,7 @@ def _render_srag_obitos_extras(df_view):
                 yaxis=dict(autorange="reversed"),
                 margin=dict(l=10, r=10, t=50, b=10), height=420,
             )
-            st.plotly_chart(_fig_h, use_container_width=True)
+            st.plotly_chart(_fig_h, width='stretch')
 
     with _r2b:
         _cl = _ob["CLASSI_LABEL"].value_counts().reset_index()
@@ -275,7 +275,7 @@ def _render_srag_obitos_extras(df_view):
             yaxis=dict(autorange="reversed"),
             margin=dict(l=10, r=10, t=50, b=10), height=420,
         )
-        st.plotly_chart(_fig_cl, use_container_width=True)
+        st.plotly_chart(_fig_cl, width='stretch')
 
     st.caption(f"Fonte: {_FONTE_SRAG}")
 
@@ -304,7 +304,7 @@ def _render_srag_obitos_extras(df_view):
         height=420,
         plot_bgcolor="white",
     )
-    st.plotly_chart(_fig_tl, use_container_width=True)
+    st.plotly_chart(_fig_tl, width='stretch')
     st.caption(f"Fonte: {_FONTE_SRAG}")
 
     st.markdown("---")
@@ -412,7 +412,7 @@ def _render_srag_obitos_extras(df_view):
         _tbl_ob["Hospital Internação"] = _tbl_ob["Hospital Internação"].str.title()
     if "Idade" in _tbl_ob.columns:
         _tbl_ob["Idade"] = pd.to_numeric(_tbl_ob["Idade"], errors="coerce").astype("Int64")
-    st.dataframe(_tbl_ob, use_container_width=True, hide_index=True)
+    st.dataframe(_tbl_ob, width='stretch', hide_index=True)
     st.caption(f"Fonte: {_FONTE_SRAG}")
 
 
@@ -611,7 +611,7 @@ with tab1:
             )
             _add_pct_hover(_fig_a, _agg_a, unit=_unit_lc)
             _bar_layout(_fig_a)
-            st.plotly_chart(_fig_a, use_container_width=True)
+            st.plotly_chart(_fig_a, width='stretch')
     elif _faixa_view == "Sexo":
         _sx = df_view.copy()
         _sx = _sx[_sx["CS_SEXO"].isin(["M", "F"])].dropna(subset=["DT_SIN_PRI"])
@@ -633,7 +633,7 @@ with tab1:
             )
             _add_pct_hover(_fig_sx, _agg_sx, unit=_unit_lc)
             _bar_layout(_fig_sx)
-            st.plotly_chart(_fig_sx, use_container_width=True)
+            st.plotly_chart(_fig_sx, width='stretch')
     else:  # Raça/Cor
         _rc = df_view.dropna(subset=["DT_SIN_PRI"]).copy()
         _rc["RACA_LABEL"] = pd.to_numeric(_rc["CS_RACA"], errors="coerce").map(_SRAG_RACA_LABELS)
@@ -655,7 +655,7 @@ with tab1:
             )
             _add_pct_hover(_fig_rc, _agg_rc, unit=_unit_lc)
             _bar_layout(_fig_rc)
-            st.plotly_chart(_fig_rc, use_container_width=True)
+            st.plotly_chart(_fig_rc, width='stretch')
     st.caption(f"Fonte: {_FONTE_SRAG}")
 
     st.markdown("---")
@@ -889,7 +889,7 @@ with tab2:
             height=580,
             plot_bgcolor="white",
         )
-        st.plotly_chart(_fig_tot, use_container_width=True)
+        st.plotly_chart(_fig_tot, width='stretch')
         st.caption(f"Fonte: {_FONTE_SRAG}")
 
     st.markdown("---")
@@ -924,7 +924,7 @@ with tab2:
         )
         _add_pct_hover(_fig_v, _agg_v, unit="testes positivos")
         _bar_layout(_fig_v)
-        st.plotly_chart(_fig_v, use_container_width=True)
+        st.plotly_chart(_fig_v, width='stretch')
         st.caption(f"Fonte: {_FONTE_SRAG}")
 
     st.markdown("---")
@@ -959,7 +959,7 @@ with tab2:
         )
         _add_pct_hover(_fig_p, _agg_p, unit="testes positivos")
         _bar_layout(_fig_p)
-        st.plotly_chart(_fig_p, use_container_width=True)
+        st.plotly_chart(_fig_p, width='stretch')
         st.caption(f"Fonte: {_FONTE_SRAG}")
 
 # ============================================================

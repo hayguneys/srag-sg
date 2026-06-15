@@ -48,15 +48,15 @@ def intro():
     st.markdown("### Acesso Rápido")
     col1, col2, col3 = st.columns(3)
     with col1:
-        if st.button("🤧 Nowcasting + Forecasting — SG", use_container_width=True):
+        if st.button("🤧 Nowcasting + Forecasting — SG", width='stretch'):
             st.session_state["sg_goto_nowcasting"] = True
             st.switch_page("pages/1_SG.py")
     with col2:
-        if st.button("🫁 Nowcasting + Forecasting — SRAG", use_container_width=True):
+        if st.button("🫁 Nowcasting + Forecasting — SRAG", width='stretch'):
             st.session_state["srag_goto_nowcasting"] = True
             st.switch_page("pages/2_SRAG.py")
     with col3:
-        if st.button("📋 Resumo Executivo", use_container_width=True):
+        if st.button("📋 Resumo Executivo", width='stretch'):
             st.switch_page("pages/3_Resumo_Executivo.py")
 
     st.info("Selecione uma página no menu à esquerda para começar.")
@@ -70,7 +70,7 @@ def intro():
     # Zoom tutorial — its own row.
     st.markdown("**Como aplicar zoom e filtrar nos gráficos**")
     if _gif_zoom.exists():
-        st.image(str(_gif_zoom), use_container_width=True)
+        st.image(str(_gif_zoom), width='stretch')
 
     st.markdown("")
 
@@ -79,7 +79,7 @@ def intro():
     if _gif_reset.exists():
         _rl, _rc, _rr = st.columns([1, 2, 1])
         with _rc:
-            st.image(str(_gif_reset), use_container_width=True)
+            st.image(str(_gif_reset), width='stretch')
 
 
 pg = st.navigation([
@@ -93,6 +93,6 @@ pg = st.navigation([
 # sidebar on every page (above each page's own filters).
 _img = Path(__file__).parent / "images" / "regua vert.png"
 if _img.exists():
-    st.sidebar.image(str(_img), use_container_width=True)
+    st.sidebar.image(str(_img), width='stretch')
 
 pg.run()
