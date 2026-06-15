@@ -84,11 +84,11 @@ st.caption(
 def _build_distrito_data():
     bairro_ds = load_bairro_distrito()
 
-    # --- SG ---------------------------------------------------------------
+    # --- SG (município de residência = Recife, data dos primeiros sintomas) --
     _sg = load_sg()
-    _sg = _sg[_sg["COD_MUNIC"] == 261160].copy()
-    _sg = _sg[_sg["DT_DIGITA"].dt.year.between(2022, 2026)].copy()
-    _yr, _wk = paho_year_week(_sg["DT_DIGITA"])
+    _sg = _sg[_sg["COD_MUNRES"] == 261160].copy()
+    _sg = _sg[_sg["DT_PRISINT"].dt.year.between(2022, 2026)].copy()
+    _yr, _wk = paho_year_week(_sg["DT_PRISINT"])
     _sg = _sg[~((_yr == 2026) & (_wk > 16))]
     if "NOM_BAIRRO" in _sg.columns:
         _sg["bairro"] = _sg["NOM_BAIRRO"].str.upper().str.strip().fillna("")

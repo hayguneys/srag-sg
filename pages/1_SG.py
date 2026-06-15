@@ -23,9 +23,9 @@ st.caption(
     "demanda de atendimento por essa doença.*"
 )
 
-# --- Load data — filter to Recife notification municipality (COD_MUNIC) -----
+# --- Load data — filter to Recife municipality of residence (COD_MUNRES) -----
 df_all = load_sg()
-df_all = df_all[df_all["COD_MUNIC"] == 261160].copy()
+df_all = df_all[df_all["COD_MUNRES"] == 261160].copy()
 
 # Per-clinic selector: display name -> substring matched against NOME_UNIDA.
 _CLINICAS_SG = {
@@ -98,9 +98,9 @@ with tab1:
             placeholder="Todas as unidades",
         )
 
-    df_filt = df_all[df_all["DT_DIGITA"].dt.year.between(_year_lo, _year_hi)].copy()
+    df_filt = df_all[df_all["DT_PRISINT"].dt.year.between(_year_lo, _year_hi)].copy()
     df_filt = _filtra_clinicas_sg(df_filt, _unit_filter)
-    _yr_f, _wk_f = paho_year_week(df_filt["DT_DIGITA"])
+    _yr_f, _wk_f = paho_year_week(df_filt["DT_PRISINT"])
     if _year_hi == 2026:
         df_filt = df_filt[~((_yr_f == 2026) & (_wk_f > 16))]
 
@@ -176,7 +176,7 @@ with tab1:
 
     _age = df_filt.copy()
     _age["IDADE"] = pd.to_numeric(_age["IDADE"], errors="coerce")
-    _age = _age.dropna(subset=["DT_DIGITA", "IDADE"])
+    _age = _age.dropna(subset=["DT_PRISINT", "IDADE"])
     for _label, _mask in FAIXA_BINS:
         _age.loc[_mask(_age["IDADE"]), "faixa"] = _label
     _age = _age.dropna(subset=["faixa"])
@@ -185,7 +185,7 @@ with tab1:
         if _age.empty:
             st.info("Sem dados de faixa etária.")
         else:
-            _yr_a, _wk_a = paho_year_week(_age["DT_DIGITA"])
+            _yr_a, _wk_a = paho_year_week(_age["DT_PRISINT"])
             _age["semana"]      = "SE " + _wk_a.astype(str).str.zfill(2) + "/" + _yr_a.astype(str)
             _age["semana_sort"] = _yr_a * 100 + _wk_a
             _agg_a = _age.groupby(["semana", "semana_sort", "faixa"]).size().reset_index(name="n")
@@ -201,14 +201,14 @@ with tab1:
             _bar_layout(_fig_a)
             st.plotly_chart(_fig_a, use_container_width=True)
     elif _faixa_view == "Sexo":
-        _sx = df_filt.dropna(subset=["DT_DIGITA"]).copy()
+        _sx = df_filt.dropna(subset=["DT_PRISINT"]).copy()
         _sx["SEXO"] = pd.to_numeric(_sx["SEXO"], errors="coerce")
         _sx = _sx[_sx["SEXO"].isin([1, 2])]
         _sx["SEXO_LABEL"] = _sx["SEXO"].astype(int).map({1: "Masculino", 2: "Feminino"})
         if _sx.empty:
             st.info("Sem dados de sexo.")
         else:
-            _yr_sx, _wk_sx = paho_year_week(_sx["DT_DIGITA"])
+            _yr_sx, _wk_sx = paho_year_week(_sx["DT_PRISINT"])
             _sx["semana"]      = "SE " + _wk_sx.astype(str).str.zfill(2) + "/" + _yr_sx.astype(str)
             _sx["semana_sort"] = _yr_sx * 100 + _wk_sx
             _agg_sx = _sx.groupby(["semana", "semana_sort", "SEXO_LABEL"]).size().reset_index(name="n")
@@ -224,13 +224,13 @@ with tab1:
             _bar_layout(_fig_sx)
             st.plotly_chart(_fig_sx, use_container_width=True)
     else:  # Raça/Cor
-        _rc = df_filt.dropna(subset=["DT_DIGITA"]).copy()
+        _rc = df_filt.dropna(subset=["DT_PRISINT"]).copy()
         _rc["RACA_LABEL"] = pd.to_numeric(_rc["RACA"], errors="coerce").map(_SG_RACA_LABELS)
         _rc = _rc.dropna(subset=["RACA_LABEL"])
         if _rc.empty:
             st.info("Sem dados de raça/cor.")
         else:
-            _yr_rc, _wk_rc = paho_year_week(_rc["DT_DIGITA"])
+            _yr_rc, _wk_rc = paho_year_week(_rc["DT_PRISINT"])
             _rc["semana"]      = "SE " + _wk_rc.astype(str).str.zfill(2) + "/" + _yr_rc.astype(str)
             _rc["semana_sort"] = _yr_rc * 100 + _wk_rc
             _agg_rc = _rc.groupby(["semana", "semana_sort", "RACA_LABEL"]).size().reset_index(name="n")
@@ -285,7 +285,7 @@ with tab1:
     else:
         _flu = df_filt.copy()
         _flu["FIN_FLU"] = pd.to_numeric(_flu["FIN_FLU"], errors="coerce")
-        _flu = _flu.dropna(subset=["DT_DIGITA", "FIN_FLU"])
+        _flu = _flu.dropna(subset=["DT_PRISINT", "FIN_FLU"])
         _flu["FIN_FLU"] = _flu["FIN_FLU"].astype(int)
         _flu = _flu[_flu["FIN_FLU"].isin([1, 2])]
         _flu["FIN_SUBT"] = pd.to_numeric(_flu.get("FIN_SUBT"), errors="coerce")
@@ -297,7 +297,7 @@ with tab1:
         if _flu.empty:
             st.info("Sem dados de tipo de influenza para os filtros selecionados.")
         else:
-            _yr_f, _wk_f = paho_year_week(_flu["DT_DIGITA"])
+            _yr_f, _wk_f = paho_year_week(_flu["DT_PRISINT"])
             _flu["semana"]      = "SE " + _wk_f.astype(str).str.zfill(2) + "/" + _yr_f.astype(str)
             _flu["semana_sort"] = _yr_f * 100 + _wk_f
             _agg_f = _flu.groupby(["semana", "semana_sort", "FLU_LABEL"]).size().reset_index(name="n")
@@ -334,10 +334,10 @@ with tab2:
             placeholder="Todas as unidades",
         )
 
-    _df_t2 = df_all[df_all["DT_DIGITA"].dt.year.between(_t2_year_lo, _t2_year_hi)].copy()
+    _df_t2 = df_all[df_all["DT_PRISINT"].dt.year.between(_t2_year_lo, _t2_year_hi)].copy()
     _df_t2 = _filtra_clinicas_sg(_df_t2, _t2_unit)
     if _t2_year_hi == 2026:
-        _yr_t2b, _wk_t2b = paho_year_week(_df_t2["DT_DIGITA"])
+        _yr_t2b, _wk_t2b = paho_year_week(_df_t2["DT_PRISINT"])
         _df_t2 = _df_t2[~((_yr_t2b == 2026) & (_wk_t2b > 16))].copy()
 
     def positividade_chart(
@@ -348,7 +348,7 @@ with tab2:
         titulo: str,
         group_weeks: int = 1,
     ):
-        base = source.dropna(subset=["DT_DIGITA"]).copy()
+        base = source.dropna(subset=["DT_PRISINT"]).copy()
         base[total_col] = pd.to_numeric(base[total_col], errors="coerce")
         base[pos_col]   = pd.to_numeric(base[pos_col],   errors="coerce")
         base = base[base[total_col] == total_val]
@@ -358,7 +358,7 @@ with tab2:
             return
 
         base = base.copy()
-        _epi_yr, _epi_wk = paho_year_week(base["DT_DIGITA"])
+        _epi_yr, _epi_wk = paho_year_week(base["DT_PRISINT"])
 
         if group_weeks == 1:
             base["semana"]      = "SE " + _epi_wk.astype(str).str.zfill(2) + "/" + _epi_yr.astype(str)
@@ -425,7 +425,7 @@ with tab2:
     st.markdown("### Total de Testes e Taxa de Positividade")
     st.caption("Soma de testes IFI e PCR Influenza realizados e taxa de positividade combinada.")
 
-    _sg_base = _df_t2.dropna(subset=["DT_DIGITA"]).copy()
+    _sg_base = _df_t2.dropna(subset=["DT_PRISINT"]).copy()
 
     _tot_rows, _pos_rows = [], []
 
@@ -433,8 +433,8 @@ with tab2:
         _ifi = _sg_base.copy()
         _ifi["IFI"]      = pd.to_numeric(_ifi["IFI"],      errors="coerce")
         _ifi["IFI_RESUL"]= pd.to_numeric(_ifi["IFI_RESUL"],errors="coerce")
-        _ifi_t = _ifi[_ifi["IFI"] == 1][["DT_DIGITA"]].copy()
-        _ifi_p = _ifi[(_ifi["IFI"] == 1) & (_ifi["IFI_RESUL"] == 1)][["DT_DIGITA"]].copy()
+        _ifi_t = _ifi[_ifi["IFI"] == 1][["DT_PRISINT"]].copy()
+        _ifi_p = _ifi[(_ifi["IFI"] == 1) & (_ifi["IFI_RESUL"] == 1)][["DT_PRISINT"]].copy()
         _tot_rows.append(_ifi_t)
         _pos_rows.append(_ifi_p)
 
@@ -442,23 +442,23 @@ with tab2:
         _pcr = _sg_base.copy()
         _pcr["PCR_RESUL"] = pd.to_numeric(_pcr["PCR_RESUL"], errors="coerce")
         _pcr["POS_PCRFLU"]= pd.to_numeric(_pcr["POS_PCRFLU"],errors="coerce")
-        _pcr_t = _pcr[_pcr["PCR_RESUL"] == 1][["DT_DIGITA"]].copy()
-        _pcr_p = _pcr[(_pcr["PCR_RESUL"] == 1) & (_pcr["POS_PCRFLU"] == 1)][["DT_DIGITA"]].copy()
+        _pcr_t = _pcr[_pcr["PCR_RESUL"] == 1][["DT_PRISINT"]].copy()
+        _pcr_p = _pcr[(_pcr["PCR_RESUL"] == 1) & (_pcr["POS_PCRFLU"] == 1)][["DT_PRISINT"]].copy()
         _tot_rows.append(_pcr_t)
         _pos_rows.append(_pcr_p)
 
     if not _tot_rows:
         st.info("Sem dados de testes IFI/PCR para o período.")
     else:
-        _tall_sg = pd.concat(_tot_rows, ignore_index=True).dropna(subset=["DT_DIGITA"])
-        _pall_sg = pd.concat(_pos_rows, ignore_index=True).dropna(subset=["DT_DIGITA"])
+        _tall_sg = pd.concat(_tot_rows, ignore_index=True).dropna(subset=["DT_PRISINT"])
+        _pall_sg = pd.concat(_pos_rows, ignore_index=True).dropna(subset=["DT_PRISINT"])
 
-        _yr_tt, _wk_tt = paho_year_week(_tall_sg["DT_DIGITA"])
+        _yr_tt, _wk_tt = paho_year_week(_tall_sg["DT_PRISINT"])
         _tall_sg["semana"]      = "SE " + _wk_tt.astype(str).str.zfill(2) + "/" + _yr_tt.astype(str)
         _tall_sg["semana_sort"] = _yr_tt * 100 + _wk_tt
         _tested_wk_sg = _tall_sg.groupby(["semana", "semana_sort"]).size().reset_index(name="total_tested")
 
-        _yr_tp, _wk_tp = paho_year_week(_pall_sg["DT_DIGITA"])
+        _yr_tp, _wk_tp = paho_year_week(_pall_sg["DT_PRISINT"])
         _pall_sg["semana"]      = "SE " + _wk_tp.astype(str).str.zfill(2) + "/" + _yr_tp.astype(str)
         _pall_sg["semana_sort"] = _yr_tp * 100 + _wk_tp
         _pos_wk_sg = _pall_sg.groupby(["semana", "semana_sort"]).size().reset_index(name="total_pos")
