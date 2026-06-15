@@ -217,23 +217,26 @@ with tab1:
 
     with _rc3:
         _sum_bairro = (
-            df_filt["NOM_BAIRRO"].str.title().value_counts().head(10).reset_index()
+            df_filt["NOM_BAIRRO"].str.title().value_counts().reset_index()
         ) if "NOM_BAIRRO" in df_filt.columns else pd.DataFrame()
         if _sum_bairro.empty:
             st.info("Sem dados de bairro.")
         else:
             _sum_bairro.columns = ["bairro", "n"]
+            st.markdown("Por Bairro")
+            # one bar per bairro (sorted desc), scrollable within a fixed-height box
+            _bairro_h = max(280, len(_sum_bairro) * 22)
             _fig_sum_bairro = px.bar(
                 _sum_bairro, x="n", y="bairro", orientation="h",
-                title="Por Bairro (top 10)",
                 labels={"bairro": "", "n": "Casos"},
                 color_discrete_sequence=["#F58518"],
             )
             _fig_sum_bairro.update_layout(
                 yaxis=dict(autorange="reversed"),
-                margin=dict(l=10, r=10, t=50, b=10), height=320,
+                margin=dict(l=10, r=10, t=10, b=10), height=_bairro_h,
             )
-            st.plotly_chart(_fig_sum_bairro, use_container_width=True)
+            with st.container(height=300):
+                st.plotly_chart(_fig_sum_bairro, use_container_width=True)
             st.caption(f"Fonte: {_FONTE_SG}")
 
     # ---- Faixa Etária — all cases ----------------------------------------
