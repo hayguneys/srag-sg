@@ -493,7 +493,6 @@ with tab1:
         total_deaths = int((df_filt["EVOLUCAO"] == 2).sum()) if "EVOLUCAO" in df_filt.columns else 0
         render_kpis([
             ("Total de casos",  fmt_int(total_cases)),
-            ("Período",         f"{_year_lo} – {_year_hi}"),
             ("Total de óbitos", fmt_int(total_deaths)),
         ])
 

@@ -155,16 +155,11 @@ with tab1:
 
     # ---- KPIs --------------------------------------------------------------
     total_cases = len(df_filt)
-    vac_cov  = int(df_filt["VACINA_COV"].notna().sum()) if "VACINA_COV" in df_filt.columns else 0
     vac_flu  = int((df_filt["VACINA"] == 1).sum())      if "VACINA"     in df_filt.columns else 0
-    trat_cov = int((df_filt["TRAT_COV"] == 1).sum())   if "TRAT_COV"   in df_filt.columns else 0
 
     render_kpis([
-        ("Total de casos",             fmt_int(total_cases)),
-        ("Período",                    f"{_year_lo} – {_year_hi}"),
-        ("Vacinação COVID",            fmt_int(vac_cov)),
-        ("Vacinação Influenza",        fmt_int(vac_flu)),
-        ("Tratamento antiviral COVID", fmt_int(trat_cov)),
+        ("Total de casos",       fmt_int(total_cases)),
+        ("Vacinação Influenza",  fmt_int(vac_flu)),
     ])
 
     st.markdown("---")
