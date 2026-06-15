@@ -693,6 +693,11 @@ with tab3:
 # ============================================================
 with tab4:
     st.markdown("### Progressão para SRAG — Recife")
+    st.caption(
+        "Casos de SG (município de residência = Recife) que progrediram para SRAG "
+        "no mesmo episódio clínico: par com início dos sintomas (SG → SRAG) em "
+        "até 30 dias."
+    )
 
     _prog = load_sg_srag_linked()
 
@@ -703,17 +708,19 @@ with tab4:
         _prog["_sexo"]  = pd.to_numeric(_prog["sg_SEXO"], errors="coerce").map({1: "Masculino", 2: "Feminino"})
         _prog["_idade"] = pd.to_numeric(_prog["sg_IDADE"], errors="coerce")
 
-        _n_fem   = (_prog["_sexo"] == "Feminino").sum()
-        _n_masc  = (_prog["_sexo"] == "Masculino").sum()
-        _avg_age = _prog["_idade"].mean()
-        _n_obito = (_prog["srag_evolucao_label"] == "Obito").sum() if "srag_evolucao_label" in _prog.columns else 0
+        _n_fem    = (_prog["_sexo"] == "Feminino").sum()
+        _n_masc   = (_prog["_sexo"] == "Masculino").sum()
+        _avg_age  = _prog["_idade"].mean()
+        _n_obito  = (_prog["srag_evolucao_label"] == "Obito").sum() if "srag_evolucao_label" in _prog.columns else 0
+        _avg_gap  = _prog["gap_dias"].mean() if "gap_dias" in _prog.columns else float("nan")
 
         render_kpis([
-            ("Total de progressões", fmt_int(len(_prog))),
-            ("Feminino",             fmt_int(_n_fem)),
-            ("Masculino",            fmt_int(_n_masc)),
-            ("Idade média (SG)",     f"{_avg_age:.1f} anos"),
-            ("Óbitos (SRAG)",        fmt_int(_n_obito)),
+            ("Total de progressões",      fmt_int(len(_prog))),
+            ("Feminino",                  fmt_int(_n_fem)),
+            ("Masculino",                 fmt_int(_n_masc)),
+            ("Idade média (SG)",          f"{_avg_age:.1f} anos"),
+            ("Óbitos (SRAG)",             fmt_int(_n_obito)),
+            ("Intervalo médio (≤30 dias)", f"{_avg_gap:.1f} dias"),
         ])
 
         st.markdown("---")
