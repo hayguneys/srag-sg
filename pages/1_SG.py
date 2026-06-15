@@ -11,6 +11,7 @@ import streamlit as st
 from utils.helpers import (
     load_sg, load_esus, load_sg_srag_linked, render_kpis, fmt_int,
     embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
+    render_epiweek_slider, filter_epiweek,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, inject_test_frames,
 )
 
@@ -138,22 +139,17 @@ tab1, tab2, tab3, tab4 = st.tabs(["📊 Descritivo", "🧪 Testes", "📈 Nowcas
 # ============================================================
 with tab1:
 
-    # ---- Year slider and unit filter ----------------------------------------
+    # ---- SE/Ano range slider and unit filter --------------------------------
     _c_year, _c_unit = st.columns([2, 2])
     with _c_year:
-        _year_lo, _year_hi = st.slider(
-            "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="sg_desc_year",
-        )
+        _se_lo, _se_hi = render_epiweek_slider("sg_desc_se")
     with _c_unit:
         _unit_filter = _unidade_multiselect("sg_desc_unit")
 
-    df_filt = df_all[df_all["DT_PRISINT"].dt.year.between(_year_lo, _year_hi)].copy()
+    df_filt = filter_epiweek(df_all, "DT_PRISINT", _se_lo, _se_hi)
     df_filt = _filtra_clinicas_sg(df_filt, _unit_filter)
-    _yr_f, _wk_f = paho_year_week(df_filt["DT_PRISINT"])
-    if _year_hi == 2026:
-        df_filt = df_filt[~((_yr_f == 2026) & (_wk_f > 16))]
 
-    # ---- KPIs with delta (previous period) -----------------------------------
+    # ---- KPIs with delta (same SE range, previous year) ----------------------
     def _calc_delta(current, previous):
         if previous == 0:
             return None
@@ -163,12 +159,11 @@ with tab1:
     total_cases = len(df_filt)
     vac_flu  = int((df_filt["VACINA"] == 1).sum())      if "VACINA"     in df_filt.columns else 0
 
-    # Previous period (year_lo-1 to year_hi-1)
-    df_prev = df_all[df_all["DT_PRISINT"].dt.year.between(_year_lo - 1, _year_hi - 1)].copy()
+    # Previous period = same SE window shifted back one year
+    _se_lo_prev = (_se_lo[0] - 1, _se_lo[1])
+    _se_hi_prev = (_se_hi[0] - 1, _se_hi[1])
+    df_prev = filter_epiweek(df_all, "DT_PRISINT", _se_lo_prev, _se_hi_prev)
     df_prev = _filtra_clinicas_sg(df_prev, _unit_filter)
-    _yr_prev, _wk_prev = paho_year_week(df_prev["DT_PRISINT"])
-    if _year_hi - 1 == 2026:
-        df_prev = df_prev[~((_yr_prev == 2026) & (_wk_prev > 16))]
 
     total_cases_prev = len(df_prev)
     vac_flu_prev = int((df_prev["VACINA"] == 1).sum()) if "VACINA" in df_prev.columns else 0
@@ -458,20 +453,15 @@ with tab1:
 # ============================================================
 with tab2:
 
-    # ---- Year slider and unit filter ----------------------------------------
+    # ---- SE/Ano range slider and unit filter --------------------------------
     _t2_cy, _t2_cu = st.columns([2, 2])
     with _t2_cy:
-        _t2_year_lo, _t2_year_hi = st.slider(
-            "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="sg_test_year",
-        )
+        _t2_se_lo, _t2_se_hi = render_epiweek_slider("sg_test_se")
     with _t2_cu:
         _t2_unit = _unidade_multiselect("sg_test_unit")
 
-    _df_t2 = df_all[df_all["DT_PRISINT"].dt.year.between(_t2_year_lo, _t2_year_hi)].copy()
+    _df_t2 = filter_epiweek(df_all, "DT_PRISINT", _t2_se_lo, _t2_se_hi)
     _df_t2 = _filtra_clinicas_sg(_df_t2, _t2_unit)
-    if _t2_year_hi == 2026:
-        _yr_t2b, _wk_t2b = paho_year_week(_df_t2["DT_PRISINT"])
-        _df_t2 = _df_t2[~((_yr_t2b == 2026) & (_wk_t2b > 16))].copy()
 
     def positividade_chart(
         source: pd.DataFrame,
@@ -693,12 +683,9 @@ with tab2:
 
     _esus = load_esus()
 
-    # Filter to notifications made in Recife, apply year slider, cap at SE16/2026
+    # Filter to notifications made in Recife and apply the SE/Ano range
     _esus = _esus[_esus["municipionotificacao"] == "Recife"].copy()
-    _esus = _esus[_esus["datanotificacao"].dt.year.between(_t2_year_lo, _t2_year_hi)].copy()
-    _yr_e, _wk_e = paho_year_week(_esus["datanotificacao"])
-    if _t2_year_hi == 2026:
-        _esus = _esus[~((_yr_e == 2026) & (_wk_e > 16))]
+    _esus = filter_epiweek(_esus, "datanotificacao", _t2_se_lo, _t2_se_hi)
     _esus = _esus.dropna(subset=["datanotificacao", "tipoteste"])
 
     if _esus.empty:

@@ -31,6 +31,76 @@ def paho_year_week(dates: pd.Series) -> tuple[pd.Series, pd.Series]:
     return epiyear.astype(int), epiweek
 
 
+# --- Epidemiological-week range selector ---------------------------------
+# Bounds of the selectable SE range. The lower bound matches the historical
+# 2022 start used across the dashboard; the upper bound is the last complete
+# epidemiological week with consolidated data (2026 SE 16).
+EPIWEEK_MIN = (2022, 1)
+EPIWEEK_MAX = (2026, 16)
+
+
+def epiweek_options(start: tuple[int, int] = EPIWEEK_MIN,
+                    end: tuple[int, int] = EPIWEEK_MAX) -> list[tuple[int, int]]:
+    """Ordered (epi_year, epi_week) tuples from start to end, inclusive.
+
+    Built by walking week-start Sundays and labelling each with
+    ``paho_year_week`` — the same PAHO/MMWR (Brazilian Ministério da Saúde)
+    algorithm used everywhere else — so every SE matches the official MS
+    epidemiological-week table by construction (incl. 53-week years like 2025).
+    """
+    y0, w0 = start
+    y1, w1 = end
+    first = pd.Timestamp(y0, 1, 1) - pd.Timedelta(days=10)
+    last  = pd.Timestamp(y1, 12, 31) + pd.Timedelta(days=10)
+    sundays = pd.date_range(first, last, freq="W-SUN")
+    yr, wk = paho_year_week(pd.Series(sundays))
+    lo_key, hi_key = y0 * 100 + w0, y1 * 100 + w1
+    out: list[tuple[int, int]] = []
+    seen: set[tuple[int, int]] = set()
+    for y, w in zip(yr.astype(int), wk.astype(int)):
+        k = y * 100 + w
+        if lo_key <= k <= hi_key and (y, w) not in seen:
+            seen.add((y, w))
+            out.append((y, w))
+    return out
+
+
+def epiweek_label(y: int, w: int) -> str:
+    """Render an epiweek tuple as "SE WW/YYYY"."""
+    return f"SE {int(w):02d}/{int(y)}"
+
+
+def render_epiweek_slider(
+    key: str,
+    label: str = "Período (SE/Ano)",
+    start: tuple[int, int] = EPIWEEK_MIN,
+    end: tuple[int, int] = EPIWEEK_MAX,
+) -> tuple[tuple[int, int], tuple[int, int]]:
+    """Render an SE/Ano range select_slider; return (se_lo, se_hi) tuples."""
+    opts = epiweek_options(start, end)
+    labels = [epiweek_label(y, w) for y, w in opts]
+    lbl_lo, lbl_hi = st.select_slider(
+        label, options=labels, value=(labels[0], labels[-1]), key=key,
+    )
+    return opts[labels.index(lbl_lo)], opts[labels.index(lbl_hi)]
+
+
+def filter_epiweek(df: pd.DataFrame, date_col: str,
+                   se_lo: tuple[int, int], se_hi: tuple[int, int]) -> pd.DataFrame:
+    """Filter df to rows whose date_col falls within the [se_lo, se_hi] SE range.
+
+    Rows with a missing date are dropped (they have no epidemiological week).
+    """
+    d = df[df[date_col].notna()]
+    if d.empty:
+        return d.copy()
+    yr, wk = paho_year_week(d[date_col])
+    key = yr * 100 + wk
+    lo = se_lo[0] * 100 + se_lo[1]
+    hi = se_hi[0] * 100 + se_hi[1]
+    return d[(key >= lo) & (key <= hi)].copy()
+
+
 # --- Paths ---------------------------------------------------------------
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"

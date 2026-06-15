@@ -11,6 +11,7 @@ import streamlit as st
 from utils.helpers import (
     load_srag_withna, render_kpis, fmt_int,
     embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
+    render_epiweek_slider, filter_epiweek,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, DATA_DIR, inject_test_frames,
 )
 
@@ -423,12 +424,10 @@ tab1, tab2, tab3 = st.tabs(["📊 Descritivo", "🦠 Testes", "📈 Nowcasting +
 # ============================================================
 with tab1:
 
-    # ---- Year slider, unit filter and Casos/Óbitos filter -------------------
+    # ---- SE/Ano range slider, unit filter and Casos/Óbitos filter -----------
     _c_year, _c_unit, _c_evo = st.columns([2, 2, 2])
     with _c_year:
-        _year_lo, _year_hi = st.slider(
-            "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="srag_desc_year",
-        )
+        _se_lo, _se_hi = render_epiweek_slider("srag_desc_se")
     with _c_unit:
         _unit_filter = _unidade_multiselect_srag("srag_desc_unit")
     with _c_evo:
@@ -437,18 +436,14 @@ with tab1:
             horizontal=True, key="srag_desc_evolucao",
         )
 
-    df_filt = df_all[df_all["DT_SIN_PRI"].dt.year.between(_year_lo, _year_hi)].copy()
+    df_filt = filter_epiweek(df_all, "DT_SIN_PRI", _se_lo, _se_hi)
     df_filt = _filtra_clinicas_srag(df_filt, _unit_filter)
-    _yr_f, _wk_f = paho_year_week(df_filt["DT_SIN_PRI"])
-    if _year_hi == 2026:
-        df_filt = df_filt[~((_yr_f == 2026) & (_wk_f > 16))]
 
-    # Previous period for delta calculation
-    df_prev = df_all[df_all["DT_SIN_PRI"].dt.year.between(_year_lo - 1, _year_hi - 1)].copy()
+    # Previous period = same SE window shifted back one year
+    _se_lo_prev = (_se_lo[0] - 1, _se_lo[1])
+    _se_hi_prev = (_se_hi[0] - 1, _se_hi[1])
+    df_prev = filter_epiweek(df_all, "DT_SIN_PRI", _se_lo_prev, _se_hi_prev)
     df_prev = _filtra_clinicas_srag(df_prev, _unit_filter)
-    _yr_prev, _wk_prev = paho_year_week(df_prev["DT_SIN_PRI"])
-    if _year_hi - 1 == 2026:
-        df_prev = df_prev[~((_yr_prev == 2026) & (_wk_prev > 16))]
 
     _show_obitos = _evo_filter == "Óbitos"
 
@@ -671,7 +666,7 @@ with tab1:
     from utils.helpers import load_bairro_distrito, _folium_choropleth_distritos, _DISTRITO_NAMES
 
     @st.cache_data(show_spinner="Calculando incidência por distrito…")
-    def _srag_dist_incidence(year_lo, year_hi, clinicas, obitos):
+    def _srag_dist_incidence(se_lo, se_hi, clinicas, obitos):
         _DS_POP = {
             "DS I": 57466, "DS II": 211471, "DS III": 193372, "DS IV": 234614,
             "DS V": 263748, "DS VI": 334271, "DS VII": 116463, "DS VIII": 228742,
@@ -679,9 +674,7 @@ with tab1:
         bairro_ds = load_bairro_distrito()
         _d = load_srag_withna()
         _d = _d[_d["ID_MN_RESI"] == "RECIFE"].copy()
-        _d = _d[_d["DT_SIN_PRI"].dt.year.between(year_lo, year_hi)].copy()
-        _yr, _wk = paho_year_week(_d["DT_SIN_PRI"])
-        _d = _d[~((_yr == 2026) & (_wk > 16))]
+        _d = filter_epiweek(_d, "DT_SIN_PRI", se_lo, se_hi)
         if obitos:
             _d = _d[pd.to_numeric(_d["EVOLUCAO"], errors="coerce") == 2].copy()
         _d = _filtra_clinicas_srag(_d, list(clinicas))
@@ -708,7 +701,7 @@ with tab1:
         )
         _srag_map_col = "taxa" if _srag_map_view.startswith("Taxa") else "n"
 
-    _srag_dist = _srag_dist_incidence(_year_lo, _year_hi, tuple(_unit_filter), _show_obitos)
+    _srag_dist = _srag_dist_incidence(_se_lo, _se_hi, tuple(_unit_filter), _show_obitos)
     if _srag_dist.empty:
         st.info("Sem dados de distrito para os filtros selecionados.")
     else:
@@ -726,12 +719,10 @@ with tab1:
 # ============================================================
 with tab2:
 
-    # ---- Year slider and unit filter ----------------------------------------
+    # ---- SE/Ano range slider and unit filter --------------------------------
     _t2_cy, _t2_cu = st.columns([2, 2])
     with _t2_cy:
-        _t2_year_lo, _t2_year_hi = st.slider(
-            "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="srag_test_year",
-        )
+        _t2_se_lo, _t2_se_hi = render_epiweek_slider("srag_test_se")
     with _t2_cu:
         _t2_unit = _unidade_multiselect_srag("srag_test_unit")
 
@@ -778,11 +769,8 @@ with tab2:
         "Rinovírus":      "#BAB0AC",
     }
 
-    _vbase = df_all[df_all["DT_SIN_PRI"].dt.year.between(_t2_year_lo, _t2_year_hi)].copy()
+    _vbase = filter_epiweek(df_all, "DT_SIN_PRI", _t2_se_lo, _t2_se_hi)
     _vbase = _filtra_clinicas_srag(_vbase, _t2_unit)
-    if _t2_year_hi == 2026:
-        _yr_vb, _wk_vb = paho_year_week(_vbase["DT_SIN_PRI"])
-        _vbase = _vbase[~((_yr_vb == 2026) & (_wk_vb > 16))]
 
     # ---- Total de Testes (Antigeno + PCR) -----------------------------------
     st.markdown("### Total de Testes — Antígeno + PCR")
