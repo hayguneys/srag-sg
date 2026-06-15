@@ -1,7 +1,7 @@
 """Reconstruct data/sg_srag_linked.parquet — SG cases that progressed to SRAG.
 
 Matches SG and SRAG records belonging to the same person and keeps the pairs
-where the SG notification precedes (or coincides with) the SRAG notification,
+where the SG symptom onset precedes (or coincides with) the SRAG symptom onset,
 i.e. a Sindrome Gripal case that later progressed to a Sindrome Respiratoria
 Aguda Grave.
 
@@ -13,7 +13,10 @@ Match key (identity combo): CPF + data de nascimento + sexo.
     use different unit-code registries (SG has 7 local codes, SRAG 139 on a
     different scale), so requiring CNES equality would discard true matches.
 
-Both banks are filtered to digitacao years 2022-2026 before matching.
+Both banks are filtered to symptom-onset years 2022-2026 before matching
+(DT_PRISINT for SG, DT_SIN_PRI for SRAG). Progression direction and the gap
+between cases are both measured on the symptom-onset dates, and only pairs
+whose onsets fall within MAX_GAP_DAYS (30) of each other are kept.
 
 Output columns consumed by pages/1_SG.py (Progressao para SRAG tab):
   sg_SEXO, sg_IDADE, sg_NOM_BAIRRO, sg_DT_DIGITA, sg_DT_PRISINT, sg_classi_label,
@@ -26,10 +29,15 @@ import pandas as pd
 
 DATA_DIR = Path(__file__).resolve().parent
 SG_PATH   = DATA_DIR / "sg_main.parquet"
-SRAG_PATH = DATA_DIR / "sragmain_withna.csv"
+SRAG_PATH = DATA_DIR / "srag_sintomas.parquet"
 OUT_PATH  = DATA_DIR / "sg_srag_linked.parquet"
 
 YEAR_MIN, YEAR_MAX = 2022, 2026
+
+# A true SG->SRAG progression is a single clinical episode: the SRAG symptom
+# onset must fall within this many days of the SG symptom onset. Longer gaps are
+# treated as separate episodes (e.g. reinfections), not progressions.
+MAX_GAP_DAYS = 30
 
 SG_CLASSI = {
     1: "SG por influenza",
@@ -78,7 +86,7 @@ def main() -> None:
     sg = pd.read_parquet(SG_PATH)
     sg["DT_DIGITA"]  = pd.to_datetime(sg["DT_DIGITA"], errors="coerce")
     sg["DT_PRISINT"] = pd.to_datetime(sg.get("DT_PRISINT"), errors="coerce")
-    sg = sg[sg["DT_DIGITA"].dt.year.between(YEAR_MIN, YEAR_MAX)].copy()
+    sg = sg[sg["DT_PRISINT"].dt.year.between(YEAR_MIN, YEAR_MAX)].copy()
     sg["cpf"] = _norm_cpf(sg["NU_CPF"])
     sg["dob"] = pd.to_datetime(sg["DT_NASC"], format="%d/%m/%Y", errors="coerce")
     sg["sex"] = pd.to_numeric(sg["SEXO"], errors="coerce").map({1: "M", 2: "F"})
@@ -97,10 +105,10 @@ def main() -> None:
     sg_keep = sg_keep.drop(columns=["CLASSI_FIN"])
 
     # ---- SRAG --------------------------------------------------------------
-    sr = pd.read_csv(SRAG_PATH, low_memory=False, encoding="latin-1")
+    sr = pd.read_parquet(SRAG_PATH)
     sr["DT_DIGITA"]  = pd.to_datetime(sr["DT_DIGITA"], errors="coerce")
     sr["DT_SIN_PRI"] = pd.to_datetime(sr.get("DT_SIN_PRI"), errors="coerce")
-    sr = sr[sr["DT_DIGITA"].dt.year.between(YEAR_MIN, YEAR_MAX)].copy()
+    sr = sr[sr["DT_SIN_PRI"].dt.year.between(YEAR_MIN, YEAR_MAX)].copy()
     sr["cpf"] = _norm_cpf(sr["NU_CPF"])
     sr["dob"] = pd.to_datetime(sr["DT_NASC"], format="%d/%m/%Y", errors="coerce")
     sr["sex"] = sr["CS_SEXO"].map({"M": "M", "F": "F"})
@@ -124,17 +132,21 @@ def main() -> None:
     # ---- match on identity combo ------------------------------------------
     linked = sg_keep.merge(sr_keep, on=["cpf", "dob", "sex"], how="inner")
 
-    # progression = SG notified on/before the SRAG notification
-    linked = linked[linked["sg_DT_DIGITA"] <= linked["srag_DT_DIGITA"]].copy()
+    # progression = SG symptom onset on/before the SRAG symptom onset
+    linked = linked[linked["sg_DT_PRISINT"] <= linked["srag_DT_SIN_PRI"]].copy()
 
     linked["gap_dias"] = (
-        linked["srag_DT_DIGITA"] - linked["sg_DT_DIGITA"]
+        linked["srag_DT_SIN_PRI"] - linked["sg_DT_PRISINT"]
     ).dt.days
+
+    # keep only pairs within the progression window (same clinical episode)
+    linked = linked[linked["gap_dias"] <= MAX_GAP_DAYS].copy()
+
     linked["gap_faixa"] = linked["gap_dias"].apply(_gap_faixa)
 
-    # one SRAG pairing per SG record: keep the earliest SRAG after the SG
-    linked = linked.sort_values("srag_DT_DIGITA").drop_duplicates(
-        subset=["cpf", "dob", "sex", "sg_DT_DIGITA"], keep="first"
+    # one SRAG pairing per SG record: keep the earliest SRAG onset after the SG
+    linked = linked.sort_values("srag_DT_SIN_PRI").drop_duplicates(
+        subset=["cpf", "dob", "sex", "sg_DT_PRISINT"], keep="first"
     )
 
     linked = linked.drop(columns=["cpf", "dob", "sex"]).reset_index(drop=True)

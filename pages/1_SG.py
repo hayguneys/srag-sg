@@ -798,14 +798,14 @@ with tab4:
 
         st.markdown("---")
 
-        st.markdown("#### Intervalo entre notificação SG e SRAG")
+        st.markdown("#### Intervalo entre início dos sintomas SG e SRAG")
         if "gap_faixa" in _prog.columns:
-            _gap_order = ["0-7d", "8-14d", "15-30d", "31-60d", "61-90d", "91-180d", "181-365d", ">365d"]
+            _gap_order = ["0-7d", "8-14d", "15-30d"]
             _gap_cnt = _prog["gap_faixa"].value_counts().reindex(_gap_order).fillna(0).reset_index()
             _gap_cnt.columns = ["intervalo", "n"]
             _fig_gap = px.bar(
                 _gap_cnt, x="intervalo", y="n",
-                title="Dias entre notificação SG e SRAG",
+                title="Dias entre início dos sintomas SG e SRAG",
                 labels={"intervalo": "Intervalo", "n": "Casos"},
                 color_discrete_sequence=["#B279A2"],
                 category_orders={"intervalo": _gap_order},
@@ -818,14 +818,14 @@ with tab4:
 
         st.markdown("#### Tabela de Casos")
         _tbl_p = _prog[[c for c in [
-            "sg_DT_DIGITA", "srag_DT_DIGITA", "gap_dias",
+            "sg_DT_PRISINT", "srag_DT_SIN_PRI", "gap_dias",
             "_sexo", "_idade", "sg_NOM_BAIRRO",
             "sg_classi_label", "srag_classi_label",
             "srag_evolucao_label", "srag_NM_UN_INTE",
         ] if c in _prog.columns]].copy()
         _tbl_p = _tbl_p.rename(columns={
-            "sg_DT_DIGITA":        "Data SG",
-            "srag_DT_DIGITA":      "Data SRAG",
+            "sg_DT_PRISINT":       "Data SG",
+            "srag_DT_SIN_PRI":     "Data SRAG",
             "gap_dias":            "Intervalo (dias)",
             "_sexo":               "Sexo",
             "_idade":              "Idade (SG)",
