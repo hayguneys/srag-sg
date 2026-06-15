@@ -11,7 +11,7 @@ import streamlit as st
 from utils.helpers import (
     load_srag_withna, render_kpis, fmt_int,
     embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
-    render_epiweek_slider, filter_epiweek,
+    render_epiweek_slider, filter_epiweek, add_ma_overlay,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, DATA_DIR, inject_test_frames,
 )
 
@@ -606,6 +606,7 @@ with tab1:
             )
             _add_pct_hover(_fig_a, _agg_a, unit=_unit_lc)
             _bar_layout(_fig_a)
+            add_ma_overlay(_fig_a, _agg_a)
             st.plotly_chart(_fig_a, width='stretch')
     elif _faixa_view == "Sexo":
         _sx = df_view.copy()
@@ -628,6 +629,7 @@ with tab1:
             )
             _add_pct_hover(_fig_sx, _agg_sx, unit=_unit_lc)
             _bar_layout(_fig_sx)
+            add_ma_overlay(_fig_sx, _agg_sx)
             st.plotly_chart(_fig_sx, width='stretch')
     else:  # Raça/Cor
         _rc = df_view.dropna(subset=["DT_SIN_PRI"]).copy()
@@ -650,6 +652,7 @@ with tab1:
             )
             _add_pct_hover(_fig_rc, _agg_rc, unit=_unit_lc)
             _bar_layout(_fig_rc)
+            add_ma_overlay(_fig_rc, _agg_rc)
             st.plotly_chart(_fig_rc, width='stretch')
     st.caption(f"Fonte: {_FONTE_SRAG}")
 

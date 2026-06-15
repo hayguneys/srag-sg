@@ -215,6 +215,41 @@ def inject_test_frames() -> None:
     )
 
 
+# --- Moving average overlay for stacked bar charts -----------------------
+def add_ma_overlay(
+    fig,
+    agg: "pd.DataFrame",
+    window: int = 4,
+    color: str = "#1f1f1f",
+    label: str | None = None,
+) -> None:
+    """Add a total-cases moving average line to a stacked weekly bar chart.
+
+    ``agg`` must have columns ``semana``, ``semana_sort``, and ``n``.
+    The MA is computed over the column-wise sum of ``n`` (total per week)
+    with a ``window``-week rolling mean (min_periods=1).
+    """
+    import plotly.graph_objects as go
+
+    totals = (
+        agg.groupby(["semana", "semana_sort"])["n"]
+        .sum()
+        .reset_index()
+        .sort_values("semana_sort")
+    )
+    totals["ma"] = totals["n"].rolling(window, min_periods=1).mean()
+    if label is None:
+        label = f"Média móvel {window} SE"
+    fig.add_trace(go.Scatter(
+        x=totals["semana"],
+        y=totals["ma"].round(1),
+        name=label,
+        mode="lines",
+        line=dict(color=color, width=2, dash="dot"),
+        hovertemplate="%{x}<br>" + label + ": %{y:.1f}<extra></extra>",
+    ))
+
+
 # --- KPI rendering -------------------------------------------------------
 def render_kpis(kpis: list[tuple[str, str] | tuple[str, str, str]]) -> None:
     """Render a row of KPI cards. Each kpi is (label, value) or (label, value, delta).
