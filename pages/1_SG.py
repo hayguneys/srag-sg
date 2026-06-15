@@ -11,11 +11,12 @@ import streamlit as st
 from utils.helpers import (
     load_sg, load_esus, load_sg_srag_linked, render_kpis, fmt_int,
     embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
-    CLASSI_FIN_LABELS, CLASSI_FIN_COLORS,
+    CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, inject_test_frames,
 )
 
 
 st.set_page_config(page_title="SG", page_icon="🤧", layout="wide")
+inject_test_frames()  # TEST: line frames around charts & KPI cards
 st.title("🤧 SG — Síndrome Gripal")
 st.caption(
     "*Vigilância sentinela de Síndrome Gripal (SG): tem como objetivo principal "

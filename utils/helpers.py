@@ -116,6 +116,37 @@ def sidebar_filters(
     return df.loc[mask].copy()
 
 
+# --- TEST: line frames around charts & KPI cards -------------------------
+# Experimental visual test. Rollback: set TEST_FRAMES = False (or revert the
+# commit that introduced inject_test_frames + its call sites).
+TEST_FRAMES = True
+
+
+def inject_test_frames() -> None:
+    """Draw a light line frame around every chart, KPI card and table.
+
+    Mirrors the bordered look of the scrollable "Por Bairro" container. Call
+    once near the top of a page. No-op when TEST_FRAMES is False.
+    """
+    if not TEST_FRAMES:
+        return
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stMetric"],
+        div[data-testid="stPlotlyChart"],
+        div[data-testid="stDataFrame"] {
+            border: 1px solid rgba(49, 51, 63, 0.2);
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            background: #ffffff;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 # --- KPI rendering -------------------------------------------------------
 def render_kpis(kpis: list[tuple[str, str]]) -> None:
     """Render a row of KPI cards. Each kpi is (label, value)."""

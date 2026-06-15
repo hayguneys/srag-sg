@@ -11,10 +11,11 @@ import streamlit as st
 from utils.helpers import (
     load_srag_withna, render_kpis, fmt_int,
     embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
-    CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, DATA_DIR,
+    CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, DATA_DIR, inject_test_frames,
 )
 
 st.set_page_config(page_title="SRAG", page_icon="🫁", layout="wide")
+inject_test_frames()  # TEST: line frames around charts & KPI cards
 st.title("🫁 SRAG — Síndrome Respiratória Aguda Grave")
 st.caption(
     "*Vigilância universal de Síndrome Respiratória Aguda Grave (SRAG): monitora "
