@@ -7,6 +7,12 @@ __pycache__/
 
 # Source / raw data files (too large for git)
 data/*.xlsx
+# Root-level raw data dumps (kept local, never committed)
+/*.xlsx
+/*.dbf
+/*.zip
+# Accidentally-extracted upstream copy (embedded git repo)
+srag-sg-main/
 data/eSUS_2020_2025.parquet
 data/eSUS_2021_2022.parquet
 data/srag_main.parquet
