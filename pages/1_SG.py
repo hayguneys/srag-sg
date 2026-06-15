@@ -270,7 +270,7 @@ with tab1:
             st.info("Sem dados de bairro.")
         else:
             _sum_bairro.columns = ["bairro", "n"]
-            st.markdown("Por Bairro")
+            st.markdown("**Por Bairro**")
             # one bar per bairro (sorted desc), scrollable within a fixed-height box
             _bairro_h = max(280, len(_sum_bairro) * 22)
             _fig_sum_bairro = px.bar(
