@@ -236,7 +236,6 @@ with tab1:
             )
             _fig_sum_sx.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
             st.plotly_chart(_fig_sum_sx, use_container_width=True)
-            st.caption(f"Fonte: {_FONTE_SG}")
 
     with _rc2:
         _sum_age = df_filt.copy()
@@ -261,7 +260,6 @@ with tab1:
             )
             _fig_sum_age.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
             st.plotly_chart(_fig_sum_age, use_container_width=True)
-            st.caption(f"Fonte: {_FONTE_SG}")
 
     with _rc3:
         _sum_bairro = (
@@ -285,7 +283,8 @@ with tab1:
             )
             with st.container(height=300):
                 st.plotly_chart(_fig_sum_bairro, use_container_width=True)
-            st.caption(f"Fonte: {_FONTE_SG}")
+
+    st.caption(f"Fonte: {_FONTE_SG}")
 
     # ---- Faixa Etária — all cases ----------------------------------------
     st.markdown("---")
@@ -856,7 +855,6 @@ with tab4:
             )
             _fig_sx.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
             st.plotly_chart(_fig_sx, use_container_width=True)
-            st.caption(f"Fonte: {_FONTE_PROG}")
 
         with _c2:
             _PROG_FAIXA_BINS = [
@@ -884,7 +882,6 @@ with tab4:
             )
             _fig_age_p.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
             st.plotly_chart(_fig_age_p, use_container_width=True)
-            st.caption(f"Fonte: {_FONTE_PROG}")
 
         with _c3:
             _bairro_p = (
@@ -903,7 +900,6 @@ with tab4:
                     margin=dict(l=10, r=10, t=50, b=10), height=320,
                 )
                 st.plotly_chart(_fig_bairro_p, use_container_width=True)
-                st.caption(f"Fonte: {_FONTE_PROG}")
 
         with _c4:
             if "srag_evolucao_label" in _prog.columns:
@@ -919,7 +915,8 @@ with tab4:
                 )
                 _fig_ev.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
                 st.plotly_chart(_fig_ev, use_container_width=True)
-                st.caption(f"Fonte: {_FONTE_PROG}")
+
+        st.caption(f"Fonte: {_FONTE_PROG}")
 
         st.markdown("---")
 
