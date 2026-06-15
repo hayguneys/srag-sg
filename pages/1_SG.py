@@ -38,15 +38,67 @@ _CLINICAS_SG = {
 }
 
 
+# Unidade de saúde dropdown: preset shortcuts + a "Unidades municipais" section
+# header, followed by the individual municipal clinics. Streamlit's multiselect
+# has no native option groups, so the header is a decorative (no-op) option and
+# the presets are resolved in _filtra_clinicas_sg.
+_UNI_TODAS  = "__todas__"
+_UNI_MUNI   = "__municipais__"
+_UNI_EXMUNI = "__exceto_municipais__"
+_UNI_DIV    = "__sec_municipais__"
+_UNI_LABELS = {
+    _UNI_TODAS:  "Todas as unidades",
+    _UNI_MUNI:   "Todas as municipais",
+    _UNI_EXMUNI: "Todas exceto municipais",
+    _UNI_DIV:    "──────  Unidades municipais  ──────",
+}
+_UNI_OPTIONS = [_UNI_TODAS, _UNI_MUNI, _UNI_EXMUNI, _UNI_DIV] + list(_CLINICAS_SG.keys())
+
+
+def _uni_label(opt):
+    return _UNI_LABELS.get(opt, opt)
+
+
+def _unidade_multiselect(key):
+    """Render the Unidade de saúde selector with presets + municipal section."""
+    return st.multiselect(
+        "Unidade de saúde", _UNI_OPTIONS,
+        default=[], key=key, format_func=_uni_label,
+        placeholder="Todas as unidades",
+    )
+
+
 def _filtra_clinicas_sg(df, selecionadas):
-    """Keep rows whose NOME_UNIDA matches any selected clinic. Empty = todas."""
-    if not selecionadas or "NOME_UNIDA" not in df.columns:
+    """Resolve the unidade selection (presets + clinics) into a row filter.
+
+    Empty, "Todas as unidades", or only the section header => no filtering.
+    """
+    if "NOME_UNIDA" not in df.columns:
         return df
-    _kw = [_CLINICAS_SG[c] for c in selecionadas if c in _CLINICAS_SG]
-    if not _kw:
+    sel = [s for s in (selecionadas or []) if s != _UNI_DIV]
+    if not sel or _UNI_TODAS in sel:
         return df
+
     _nm = df["NOME_UNIDA"].str.upper().str.strip().fillna("")
-    return df[_nm.apply(lambda x: any(k in x for k in _kw))].copy()
+    _muni_kw = list(_CLINICAS_SG.values())
+    is_muni = _nm.apply(lambda x: any(k in x for k in _muni_kw))
+
+    mask = pd.Series(False, index=df.index)
+    matched = False
+    if _UNI_MUNI in sel:
+        mask = mask | is_muni
+        matched = True
+    if _UNI_EXMUNI in sel:
+        mask = mask | (~is_muni)
+        matched = True
+    _indiv_kw = [_CLINICAS_SG[c] for c in sel if c in _CLINICAS_SG]
+    if _indiv_kw:
+        mask = mask | _nm.apply(lambda x: any(k in x for k in _indiv_kw))
+        matched = True
+
+    if not matched:
+        return df
+    return df[mask].copy()
 
 _FONTE_SG   = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP"
 _FONTE_ESUS = "SESAU/SEVS/GGAM/GEVEPI/DDT/ESUS"
@@ -92,11 +144,7 @@ with tab1:
             "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="sg_desc_year",
         )
     with _c_unit:
-        _unit_filter = st.multiselect(
-            "Unidade de saúde", list(_CLINICAS_SG.keys()),
-            default=[], key="sg_desc_unit",
-            placeholder="Todas as unidades",
-        )
+        _unit_filter = _unidade_multiselect("sg_desc_unit")
 
     df_filt = df_all[df_all["DT_PRISINT"].dt.year.between(_year_lo, _year_hi)].copy()
     df_filt = _filtra_clinicas_sg(df_filt, _unit_filter)
@@ -402,11 +450,7 @@ with tab2:
             "Período (ano)", 2022, 2026, (2022, 2026), step=1, key="sg_test_year",
         )
     with _t2_cu:
-        _t2_unit = st.multiselect(
-            "Unidade de saúde", list(_CLINICAS_SG.keys()),
-            default=[], key="sg_test_unit",
-            placeholder="Todas as unidades",
-        )
+        _t2_unit = _unidade_multiselect("sg_test_unit")
 
     _df_t2 = df_all[df_all["DT_PRISINT"].dt.year.between(_t2_year_lo, _t2_year_hi)].copy()
     _df_t2 = _filtra_clinicas_sg(_df_t2, _t2_unit)
