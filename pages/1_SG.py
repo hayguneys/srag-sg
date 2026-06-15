@@ -282,7 +282,7 @@ with tab1:
                 yaxis=dict(autorange="reversed"),
                 margin=dict(l=10, r=10, t=10, b=10), height=_bairro_h,
             )
-            with st.container(height=300):
+            with st.container(height=300, border=False):
                 st.plotly_chart(_fig_sum_bairro, use_container_width=True)
 
     st.caption(f"Fonte: {_FONTE_SG}")
