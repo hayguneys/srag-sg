@@ -647,17 +647,6 @@ with tab2:
         st.caption(f"Fonte: {_FONTE_SG}")
 
     st.markdown("---")
-    st.markdown("### Taxas de Positividade — IFI")
-    positividade_chart(
-        _df_t2,
-        total_col="IFI",      total_val=1,
-        pos_col="IFI_RESUL",  pos_val=1,
-        bar_name="Testes IFI", bar_color="#4C78A8",
-        titulo="Testes IFI e Taxa de Positividade por Semana Epidemiológica",
-    )
-    st.caption(f"Fonte: {_FONTE_SG}")
-
-    st.markdown("---")
     st.markdown("### Taxas de Positividade — PCR Influenza")
     pcr_view = st.radio(
         "Agrupamento", ["Semanal", "4 Semanas"],
