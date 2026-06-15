@@ -15,7 +15,7 @@ from utils.helpers import (
 )
 
 st.set_page_config(page_title="SRAG", page_icon="🫁", layout="wide")
-inject_test_frames()  # TEST: line frames around charts & KPI cards
+inject_test_frames()  # TEST: line frames around KPI cards
 st.title("🫁 SRAG — Síndrome Respiratória Aguda Grave")
 st.caption(
     "*Vigilância universal de Síndrome Respiratória Aguda Grave (SRAG): monitora "
