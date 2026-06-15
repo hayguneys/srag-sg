@@ -145,9 +145,6 @@ with tab1:
                 "<extra></extra>"
             )
 
-    # ---- Faixa Etária — all cases ----------------------------------------
-    st.markdown("#### Total de Casos")
-
     FAIXA_BINS = [
         ("1–4",   lambda a: (a >= 1)  & (a <= 4)),
         ("5–9",   lambda a: (a >= 5)  & (a <= 9)),
@@ -168,6 +165,80 @@ with tab1:
         "50–59": "#B279A2",
         "60+":   "#FF9DA6",
     }
+
+    # ---- Resumo — perfil dos casos (sexo, faixa etária, bairro) -----------------
+    st.markdown("#### Perfil dos Casos")
+
+    _rc1, _rc2, _rc3 = st.columns(3)
+
+    with _rc1:
+        _sum_sx = df_filt.copy()
+        _sum_sx["SEXO"] = pd.to_numeric(_sum_sx["SEXO"], errors="coerce")
+        _sum_sx = _sum_sx[_sum_sx["SEXO"].isin([1, 2])]
+        _sum_sx["_sexo"] = _sum_sx["SEXO"].astype(int).map({1: "Masculino", 2: "Feminino"})
+        _sum_sx_cnt = _sum_sx["_sexo"].value_counts().reset_index()
+        _sum_sx_cnt.columns = ["sexo", "n"]
+        if _sum_sx_cnt.empty:
+            st.info("Sem dados de sexo.")
+        else:
+            _fig_sum_sx = px.pie(
+                _sum_sx_cnt, names="sexo", values="n", title="Por Sexo", hole=0.45,
+                color="sexo",
+                color_discrete_map={"Feminino": "#E45756", "Masculino": "#4C78A8"},
+            )
+            _fig_sum_sx.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
+            st.plotly_chart(_fig_sum_sx, use_container_width=True)
+            st.caption(f"Fonte: {_FONTE_SG}")
+
+    with _rc2:
+        _sum_age = df_filt.copy()
+        _sum_age["IDADE"] = pd.to_numeric(_sum_age["IDADE"], errors="coerce")
+        _sum_age = _sum_age.dropna(subset=["IDADE"])
+        for _lbl, _msk in FAIXA_BINS:
+            _sum_age.loc[_msk(_sum_age["IDADE"]), "faixa"] = _lbl
+        _sum_age = _sum_age.dropna(subset=["faixa"])
+        _sum_age_order = [l for l, _ in FAIXA_BINS]
+        _sum_age_cnt = (
+            _sum_age["faixa"].value_counts().reindex(_sum_age_order).fillna(0).reset_index()
+        )
+        _sum_age_cnt.columns = ["faixa", "n"]
+        if _sum_age_cnt["n"].sum() == 0:
+            st.info("Sem dados de faixa etária.")
+        else:
+            _fig_sum_age = px.bar(
+                _sum_age_cnt, x="faixa", y="n", title="Por Faixa Etária",
+                labels={"faixa": "Faixa Etária", "n": "Casos"},
+                color_discrete_sequence=["#72B7B2"],
+                category_orders={"faixa": _sum_age_order},
+            )
+            _fig_sum_age.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
+            st.plotly_chart(_fig_sum_age, use_container_width=True)
+            st.caption(f"Fonte: {_FONTE_SG}")
+
+    with _rc3:
+        _sum_bairro = (
+            df_filt["NOM_BAIRRO"].str.title().value_counts().head(10).reset_index()
+        ) if "NOM_BAIRRO" in df_filt.columns else pd.DataFrame()
+        if _sum_bairro.empty:
+            st.info("Sem dados de bairro.")
+        else:
+            _sum_bairro.columns = ["bairro", "n"]
+            _fig_sum_bairro = px.bar(
+                _sum_bairro, x="n", y="bairro", orientation="h",
+                title="Por Bairro (top 10)",
+                labels={"bairro": "", "n": "Casos"},
+                color_discrete_sequence=["#F58518"],
+            )
+            _fig_sum_bairro.update_layout(
+                yaxis=dict(autorange="reversed"),
+                margin=dict(l=10, r=10, t=50, b=10), height=320,
+            )
+            st.plotly_chart(_fig_sum_bairro, use_container_width=True)
+            st.caption(f"Fonte: {_FONTE_SG}")
+
+    # ---- Faixa Etária — all cases ----------------------------------------
+    st.markdown("---")
+    st.markdown("#### Total de Casos")
 
     _faixa_view = st.radio(
         "Visualização", ["Faixa Etária", "Sexo", "Raça/Cor"],
@@ -246,77 +317,6 @@ with tab1:
             _bar_layout(_fig_rc)
             st.plotly_chart(_fig_rc, use_container_width=True)
     st.caption(f"Fonte: {_FONTE_SG}")
-
-    # ---- Resumo — perfil dos casos (sexo, faixa etária, bairro) -----------------
-    st.markdown("---")
-    st.markdown("#### Perfil dos Casos")
-
-    _rc1, _rc2, _rc3 = st.columns(3)
-
-    with _rc1:
-        _sum_sx = df_filt.copy()
-        _sum_sx["SEXO"] = pd.to_numeric(_sum_sx["SEXO"], errors="coerce")
-        _sum_sx = _sum_sx[_sum_sx["SEXO"].isin([1, 2])]
-        _sum_sx["_sexo"] = _sum_sx["SEXO"].astype(int).map({1: "Masculino", 2: "Feminino"})
-        _sum_sx_cnt = _sum_sx["_sexo"].value_counts().reset_index()
-        _sum_sx_cnt.columns = ["sexo", "n"]
-        if _sum_sx_cnt.empty:
-            st.info("Sem dados de sexo.")
-        else:
-            _fig_sum_sx = px.pie(
-                _sum_sx_cnt, names="sexo", values="n", title="Por Sexo", hole=0.45,
-                color="sexo",
-                color_discrete_map={"Feminino": "#E45756", "Masculino": "#4C78A8"},
-            )
-            _fig_sum_sx.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
-            st.plotly_chart(_fig_sum_sx, use_container_width=True)
-            st.caption(f"Fonte: {_FONTE_SG}")
-
-    with _rc2:
-        _sum_age = df_filt.copy()
-        _sum_age["IDADE"] = pd.to_numeric(_sum_age["IDADE"], errors="coerce")
-        _sum_age = _sum_age.dropna(subset=["IDADE"])
-        for _lbl, _msk in FAIXA_BINS:
-            _sum_age.loc[_msk(_sum_age["IDADE"]), "faixa"] = _lbl
-        _sum_age = _sum_age.dropna(subset=["faixa"])
-        _sum_age_order = [l for l, _ in FAIXA_BINS]
-        _sum_age_cnt = (
-            _sum_age["faixa"].value_counts().reindex(_sum_age_order).fillna(0).reset_index()
-        )
-        _sum_age_cnt.columns = ["faixa", "n"]
-        if _sum_age_cnt["n"].sum() == 0:
-            st.info("Sem dados de faixa etária.")
-        else:
-            _fig_sum_age = px.bar(
-                _sum_age_cnt, x="faixa", y="n", title="Por Faixa Etária",
-                labels={"faixa": "Faixa Etária", "n": "Casos"},
-                color_discrete_sequence=["#72B7B2"],
-                category_orders={"faixa": _sum_age_order},
-            )
-            _fig_sum_age.update_layout(margin=dict(l=10, r=10, t=50, b=10), height=320)
-            st.plotly_chart(_fig_sum_age, use_container_width=True)
-            st.caption(f"Fonte: {_FONTE_SG}")
-
-    with _rc3:
-        _sum_bairro = (
-            df_filt["NOM_BAIRRO"].str.title().value_counts().head(10).reset_index()
-        ) if "NOM_BAIRRO" in df_filt.columns else pd.DataFrame()
-        if _sum_bairro.empty:
-            st.info("Sem dados de bairro.")
-        else:
-            _sum_bairro.columns = ["bairro", "n"]
-            _fig_sum_bairro = px.bar(
-                _sum_bairro, x="n", y="bairro", orientation="h",
-                title="Por Bairro (top 10)",
-                labels={"bairro": "", "n": "Casos"},
-                color_discrete_sequence=["#F58518"],
-            )
-            _fig_sum_bairro.update_layout(
-                yaxis=dict(autorange="reversed"),
-                margin=dict(l=10, r=10, t=50, b=10), height=320,
-            )
-            st.plotly_chart(_fig_sum_bairro, use_container_width=True)
-            st.caption(f"Fonte: {_FONTE_SG}")
 
     # ---- FIN_FLU — Influenza type (A segmented by FIN_SUBT subtypes) ------------
     st.markdown("---")
