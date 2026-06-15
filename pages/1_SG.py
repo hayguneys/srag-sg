@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from utils.helpers import (
-    load_sg, load_esus, load_sg_srag_linked, render_kpis, fmt_int,
+    load_sg, load_sg_srag_linked, render_kpis, fmt_int,
     embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
     render_epiweek_slider, filter_epiweek,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, inject_test_frames,
@@ -103,7 +103,6 @@ def _filtra_clinicas_sg(df, selecionadas):
     return df[mask].copy()
 
 _FONTE_SG   = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP"
-_FONTE_ESUS = "SESAU/SEVS/GGAM/GEVEPI/DDT/ESUS"
 _FONTE_PROG = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP"
 
 # Recife total population (IBGE Censo 2022) for incidence rate per 100k
@@ -662,117 +661,6 @@ with tab2:
     )
     st.caption(f"Fonte: {_FONTE_SG}")
 
-    # ------------------------------------------------------------------ eSUS
-    st.markdown("---")
-    st.markdown("### Total de Testes e Taxa de Positividade — COVID-19")
-    st.caption(
-        "Testes por tipo (coluna `tipoteste`) agrupados por semana de notificação. "
-        "Positividade = `resultadofinal == 'Positivo'` / (Positivo + Negativo)."
-    )
-
-    _esus = load_esus()
-
-    # Filter to notifications made in Recife and apply the SE/Ano range
-    _esus = _esus[_esus["municipionotificacao"] == "Recife"].copy()
-    _esus = filter_epiweek(_esus, "datanotificacao", _t2_se_lo, _t2_se_hi)
-    _esus = _esus.dropna(subset=["datanotificacao", "tipoteste"])
-
-    if _esus.empty:
-        st.info("Sem dados eSUS para o período.")
-    else:
-        _yr_e2, _wk_e2 = paho_year_week(_esus["datanotificacao"])
-        _esus["semana"]      = "SE " + _wk_e2.astype(str).str.zfill(2) + "/" + _yr_e2.astype(str)
-        _esus["semana_sort"] = _yr_e2 * 100 + _wk_e2
-
-        # Stacked bar: total tests by type per week
-        _agg_e = (
-            _esus.groupby(["semana", "semana_sort", "tipoteste"])
-                 .size().reset_index(name="n")
-        )
-        _ord_e = (
-            _agg_e[["semana", "semana_sort"]].drop_duplicates()
-            .sort_values("semana_sort")["semana"].tolist()
-        )
-        _test_types = (
-            _agg_e.groupby("tipoteste")["n"].sum()
-            .sort_values(ascending=False).index.tolist()
-        )
-
-        # Palette — only assign colours for types actually present in the data
-        _PALETTE = [
-            "#4C78A8", "#E45756", "#F58518", "#72B7B2",
-            "#54A24B", "#EECA3B", "#B279A2", "#FF9DA6", "#9C9C9C",
-        ]
-        ESUS_COLORS = {t: _PALETTE[i % len(_PALETTE)] for i, t in enumerate(_test_types)}
-
-        _fig_e = px.bar(
-            _agg_e, x="semana", y="n", color="tipoteste",
-            color_discrete_map=ESUS_COLORS,
-            title="Total de Testes COVID-19 por Tipo e Semana Epidemiológica",
-            labels={"semana": "Semana Epidemiológica", "n": "Nº Testes", "tipoteste": "Tipo de Teste"},
-            category_orders={"semana": _ord_e, "tipoteste": _test_types},
-        )
-
-        # Positivity line: Positivo / (Positivo + Negativo) per week
-        _pos_wk_e = (
-            _esus[_esus["resultadofinal"] == "Positivo"]
-            .groupby(["semana", "semana_sort"]).size().reset_index(name="positivos")
-        )
-        _neg_wk_e = (
-            _esus[_esus["resultadofinal"].isin(["Positivo", "Negativo"])]
-            .groupby(["semana", "semana_sort"]).size().reset_index(name="com_resultado")
-        )
-        _rate_e = _neg_wk_e.merge(_pos_wk_e, on=["semana", "semana_sort"], how="left").fillna(0)
-        _rate_e = _rate_e.sort_values("semana_sort")
-        _rate_e["pct"] = (_rate_e["positivos"] / _rate_e["com_resultado"] * 100).round(1)
-
-        _pct_max_e = _rate_e["pct"].max()
-        _pct_axis_max_e = max(_pct_max_e * 1.15, 1)
-
-        _fig_e.add_trace(go.Scatter(
-            x=_rate_e["semana"],
-            y=_rate_e["pct"],
-            name="Positividade (%)",
-            mode="lines+markers",
-            line=dict(color="#E45756", width=2),
-            marker=dict(size=5),
-            yaxis="y2",
-            customdata=list(zip(
-                _rate_e["positivos"].astype(int),
-                _rate_e["com_resultado"].astype(int),
-            )),
-            hovertemplate=(
-                "%{x}<br>Positividade: %{y:.1f}%"
-                "<br>(%{customdata[0]} positivos de %{customdata[1]} com resultado)"
-                "<extra></extra>"
-            ),
-        ))
-
-        _fig_e.update_layout(
-            barmode="stack",
-            xaxis=dict(
-                title=dict(text="Semana Epidemiológica", standoff=8),
-                tickangle=-90,
-                categoryorder="array",
-                categoryarray=_ord_e,
-            ),
-            yaxis=dict(title="Nº Testes", rangemode="tozero"),
-            yaxis2=dict(
-                overlaying="y",
-                side="right",
-                range=[0, _pct_axis_max_e],
-                showticklabels=False,
-                showgrid=False,
-                zeroline=False,
-                title="",
-            ),
-            legend=dict(orientation="h", y=-0.40, x=0.5, xanchor="center", yanchor="top", title_text=""),
-            margin=dict(l=20, r=60, t=50, b=140),
-            height=600,
-            plot_bgcolor="white",
-        )
-        st.plotly_chart(_fig_e, width='stretch')
-        st.caption(f"Fonte: {_FONTE_ESUS}")
 
 # ============================================================
 # TAB 3 — Nowcasting + Forecasting
