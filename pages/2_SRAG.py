@@ -244,18 +244,21 @@ def _render_srag_summary_grid(df_view, unidade):
         st.plotly_chart(_fig_rc, width='stretch')
 
     with _r1d:
-        _bc = _ob["NM_BAIRRO"].value_counts().head(10).reset_index()
+        _bc = _ob["NM_BAIRRO"].value_counts().reset_index()
         _bc.columns = ["bairro", "n"]
+        st.markdown("**Por Bairro**")
+        _bairro_h = max(280, len(_bc) * 22)
         _fig_bairro = px.bar(
-            _bc, x="n", y="bairro", orientation="h", title="Por Bairro (top 10)",
+            _bc, x="n", y="bairro", orientation="h",
             labels={"bairro": "", "n": unidade},
             color_discrete_sequence=["#F58518"],
         )
         _fig_bairro.update_layout(
             yaxis=dict(autorange="reversed"),
-            margin=dict(l=10, r=10, t=50, b=10), height=320,
+            margin=dict(l=10, r=10, t=10, b=10), height=_bairro_h,
         )
-        st.plotly_chart(_fig_bairro, width='stretch')
+        with st.container(height=300, border=False):
+            st.plotly_chart(_fig_bairro, width='stretch')
     st.caption(f"Fonte: {_FONTE_SRAG}")
 
 
@@ -798,40 +801,33 @@ with tab2:
     _vbase = filter_epiweek(df_all, "DT_SIN_PRI", _t2_se_lo, _t2_se_hi)
     _vbase = _filtra_clinicas_srag(_vbase, _t2_unit)
 
-    # ---- Total de Testes (Antigeno + PCR) -----------------------------------
-    st.markdown("### Total de Testes — Antígeno + PCR")
+    # ---- Total de Testes -----------------------------------
+    st.markdown("### Total de Testes")
     st.caption(
         "Total de testes realizados"
         "e taxa de positividade por semana epidemiológica."
     )
 
-    _total_view = st.radio(
-        "Tipo de Teste", ["Total", "PCR", "Antígeno"],
-        horizontal=True, key="srag_total_toggle",
-    )
-
     _ttested_rows = []
     _tpos_rows    = []
 
-    if _total_view in ("PCR", "Total"):
-        # POS_PCROUT / POS_PCRFLU: non-null = tested, value == 1 = positive
-        for _pc in ["POS_PCROUT", "POS_PCRFLU"]:
-            if _pc not in _vbase.columns:
-                continue
-            _tmp = _vbase[["DT_SIN_PRI", _pc]].copy()
-            _tmp[_pc] = pd.to_numeric(_tmp[_pc], errors="coerce")
-            _ttested_rows.append(_tmp[_tmp[_pc].notna()][["DT_SIN_PRI"]].copy())
-            _tpos_rows.append(_tmp[_tmp[_pc] == 1][["DT_SIN_PRI"]].copy())
+    # PCR: POS_PCROUT / POS_PCRFLU — non-null = tested, value == 1 = positive
+    for _pc in ["POS_PCROUT", "POS_PCRFLU"]:
+        if _pc not in _vbase.columns:
+            continue
+        _tmp = _vbase[["DT_SIN_PRI", _pc]].copy()
+        _tmp[_pc] = pd.to_numeric(_tmp[_pc], errors="coerce")
+        _ttested_rows.append(_tmp[_tmp[_pc].notna()][["DT_SIN_PRI"]].copy())
+        _tpos_rows.append(_tmp[_tmp[_pc] == 1][["DT_SIN_PRI"]].copy())
 
-    if _total_view in ("Antígeno", "Total"):
-        # AN_* columns: value in {1,2,3} = tested, value == 1 = positive
-        for _col in VIRUS_COLS:
-            if _col not in _vbase.columns:
-                continue
-            _tmp = _vbase[["DT_SIN_PRI", _col]].copy()
-            _tmp[_col] = pd.to_numeric(_tmp[_col], errors="coerce")
-            _ttested_rows.append(_tmp[_tmp[_col].isin([1, 2, 3])][["DT_SIN_PRI"]].copy())
-            _tpos_rows.append(_tmp[_tmp[_col] == 1][["DT_SIN_PRI"]].copy())
+    # Antígeno: AN_* columns — value in {1,2,3} = tested, value == 1 = positive
+    for _col in VIRUS_COLS:
+        if _col not in _vbase.columns:
+            continue
+        _tmp = _vbase[["DT_SIN_PRI", _col]].copy()
+        _tmp[_col] = pd.to_numeric(_tmp[_col], errors="coerce")
+        _ttested_rows.append(_tmp[_tmp[_col].isin([1, 2, 3])][["DT_SIN_PRI"]].copy())
+        _tpos_rows.append(_tmp[_tmp[_col] == 1][["DT_SIN_PRI"]].copy())
 
     if not _ttested_rows:
         st.info("Colunas de teste não encontradas.")
@@ -881,7 +877,7 @@ with tab2:
             ),
         ))
         _fig_tot.update_layout(
-            title=f"Total de Testes Realizados e Taxa de Positividade — {_total_view}",
+            title="Total de Testes Realizados e Taxa de Positividade",
             xaxis=dict(
                 title="Semana Epidemiológica",
                 tickangle=-90,
