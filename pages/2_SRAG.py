@@ -78,8 +78,7 @@ def _uni_label(opt):
         return _UNI_LABELS[opt]
     if opt in _CLINICAS_SRAG:
         return opt
-    code = _SRAG_UNIT_CODE.get(opt, "")
-    return f"{opt} · cód. {code}" if code else opt
+    return opt
 
 
 def _unidade_multiselect_srag(key):
