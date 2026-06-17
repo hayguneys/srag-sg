@@ -10,7 +10,7 @@ import streamlit.components.v1 as components
 from utils.helpers import (
     load_sg, load_srag_withna, load_esus_kpi,
     render_kpis, fmt_int, paho_year_week,
-    embed_html_plot, render_forecast_table,
+    embed_html_plot,
     load_bairro_distrito, _folium_choropleth_distritos, _DISTRITO_NAMES,
 )
 
@@ -50,22 +50,12 @@ st.caption("Fonte: BRASIL. Ministério da Saúde. eSUS-Notifica. Brasília, 2026
 st.markdown("---")
 
 # ============================================================
-# SECTION 2 — Nowcasting + Forecasting
+# SECTION 2 — Nowcasting + Forecasting (SRAG only)
 # ============================================================
 st.markdown("## Nowcasting + Forecasting")
-_fc1, _fc2 = st.columns(2)
-with _fc1:
-    st.markdown("#### SG — Síndrome Gripal")
-    embed_html_plot("nowcasting_sg.html", height=520, fix_legend=True)
-    st.markdown("**Semanas previstas**")
-    render_forecast_table("nowcasting_sg.html", caption=False)
-    st.caption("Fonte: BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndrome Gripal. Brasília, 2026.")
-with _fc2:
-    st.markdown("#### SRAG — Síndrome Respiratória Aguda Grave")
-    embed_html_plot("nowcasting_srag.html", height=520, fix_legend=True)
-    st.markdown("**Semanas previstas**")
-    render_forecast_table("nowcasting_srag.html", caption=False)
-    st.caption("Fonte: BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndromes Respiratórias Agudas Graves. Brasília, 2026.")
+st.markdown("#### SRAG — Síndrome Respiratória Aguda Grave")
+embed_html_plot("nowcasting_srag.html", height=520, fix_legend=True)
+st.caption("Fonte: BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndromes Respiratórias Agudas Graves. Brasília, 2026.")
 
 st.markdown("---")
 

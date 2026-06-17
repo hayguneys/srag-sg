@@ -10,7 +10,7 @@ import streamlit as st
 
 from utils.helpers import (
     load_sg, load_sg_srag_linked, render_kpis, fmt_int,
-    embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
+    render_ma_chart, paho_year_week,
     render_epiweek_slider, filter_epiweek, add_ma_overlay,
     render_seasonality_hist, unit_code_map, SG_EPIWEEK_MIN,
     period_compare_label, period_compare_se_label, format_kpi_delta,
@@ -664,15 +664,6 @@ with tab2:
 # TAB 3 — Nowcasting + Forecasting
 # ============================================================
 with tab3:
-    st.markdown("### Nowcasting + Forecasting — SG (R / INLA)")
-    st.caption(
-        "Modelo INLA binomial negativo usando as variáveis: idade, atraso de notificação, casos por semana. "
-        "Previsão de forecasting para as próximas 4 semanas depois da última data disponível."
-    )
-    embed_html_plot("nowcasting_sg.html", height=750, fix_legend=True)
-    st.caption(f"Fonte: {_FONTE_SG}")
-
-    st.markdown("---")
     st.markdown("### Média Móvel — Semanas Epidemiológicas 2026")
     st.caption("Média móvel de 4 semanas sobre casos semanais por semana de início dos sintomas (`DT_PRISINT`).")
     render_ma_chart(df_all, onset_col="DT_PRISINT", titulo="Média Móvel 4 sem. — SG (ILI)")
@@ -682,11 +673,6 @@ with tab3:
     st.markdown("### Sazonalidade — Média Histórica por Semana Epidemiológica")
     render_seasonality_hist(df_all, onset_col="DT_PRISINT",
                             titulo="Sazonalidade — SG (média por SE, todos os anos)")
-    st.caption(f"Fonte: {_FONTE_SG}")
-
-    st.markdown("---")
-    st.markdown("### Semanas previstas")
-    render_forecast_table("nowcasting_sg.html")
     st.caption(f"Fonte: {_FONTE_SG}")
 
 # ============================================================
