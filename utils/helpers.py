@@ -741,7 +741,7 @@ def _folium_choropleth_distritos(data: pd.DataFrame, color_col: str = "n") -> st
         legend_label = "Casos"
 
     m = folium.Map(
-        location=[-8.0991, -34.8711],
+        location=[-8.1891, -34.8711],
         zoom_start=11,
         tiles="CartoDB positron",
         control_scale=True,
