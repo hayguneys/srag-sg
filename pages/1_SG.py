@@ -469,6 +469,73 @@ with tab1:
             st.plotly_chart(_fig_f, width='stretch')
             st.caption(f"Fonte: {_FONTE_SG}")
 
+    # ---- Tipo de Vírus -------------------------------------------------------
+    st.markdown("---")
+    st.markdown("#### Tipo de Vírus")
+
+    _SG_VIRUS_GROUPS = {
+        "Influenza":       ["IFI_FLU",   "PCR_FLU"],
+        "VSR":             ["IFI_VRS",   "PCR_VRS"],
+        "SARS-CoV-2":      ["IFI_SARS2", "PCR_SARS2"],
+        "Adenovírus":      ["IFI_ADENO", "PCR_ADENO"],
+        "Parainfluenza 1": ["IFI_PARA1", "PCR_PARA1"],
+        "Parainfluenza 2": ["IFI_PARA2", "PCR_PARA2"],
+        "Parainfluenza 3": ["IFI_PARA3", "PCR_PARA3"],
+        "Parainfluenza 4": ["IFI_PARA4", "PCR_PARA4"],
+        "Metapneumovírus": ["PCR_METAP"],
+        "Rinovírus":       ["PCR_RINO"],
+        "Bocavírus":       ["PCR_BOCA"],
+    }
+    _SG_VIRUS_COLORS = {
+        "Influenza":       "#EECA3B",
+        "VSR":             "#B279A2",
+        "SARS-CoV-2":      "#54A24B",
+        "Adenovírus":      "#72B7B2",
+        "Parainfluenza 1": "#4C78A8",
+        "Parainfluenza 2": "#F58518",
+        "Parainfluenza 3": "#E45756",
+        "Parainfluenza 4": "#9C9C9C",
+        "Metapneumovírus": "#FF9DA6",
+        "Rinovírus":       "#BAB0AC",
+        "Bocavírus":       "#636363",
+    }
+
+    _vrows = []
+    for _vlabel, _vcols in _SG_VIRUS_GROUPS.items():
+        _avail = [c for c in _vcols if c in df_filt.columns]
+        if not _avail:
+            continue
+        _vmask = pd.concat(
+            [pd.to_numeric(df_filt[c], errors="coerce") >= 1 for c in _avail], axis=1
+        ).any(axis=1)
+        _vtmp = df_filt.loc[_vmask & df_filt["DT_PRISINT"].notna(), ["DT_PRISINT"]].copy()
+        _vtmp["virus"] = _vlabel
+        _vrows.append(_vtmp)
+
+    if not _vrows:
+        st.info("Sem dados de tipo de vírus para os filtros selecionados.")
+    else:
+        _vlong = pd.concat(_vrows, ignore_index=True)
+        _yr_v, _wk_v = paho_year_week(_vlong["DT_PRISINT"])
+        _vlong["semana"]      = "SE " + _wk_v.astype(str).str.zfill(2) + "/" + _yr_v.astype(str)
+        _vlong["semana_sort"] = _yr_v * 100 + _wk_v
+        _agg_v = _vlong.groupby(["semana", "semana_sort", "virus"]).size().reset_index(name="n")
+        _ord_v = _agg_v[["semana", "semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
+        _present_v = [l for l in _SG_VIRUS_GROUPS if l in _agg_v["virus"].unique()]
+        _fig_v = px.bar(
+            _agg_v, x="semana", y="n", color="virus",
+            color_discrete_map=_SG_VIRUS_COLORS,
+            title="Tipo de Vírus por Semana Epidemiológica",
+            labels={"semana": "Semana Epidemiológica", "n": "Nº Casos", "virus": "Vírus"},
+            category_orders={"semana": _ord_v, "virus": _present_v},
+        )
+        _add_pct_hover(_fig_v, _agg_v)
+        _bar_layout(_fig_v)
+        _tot_v = _agg_v.groupby(["semana", "semana_sort"])["n"].sum().reset_index()
+        add_ma_overlay(_fig_v, _tot_v)
+        st.plotly_chart(_fig_v, width='stretch')
+        st.caption(f"Fonte: {_FONTE_SG}")
+
 
 # ============================================================
 # TAB 2 — Taxas de Positividade
