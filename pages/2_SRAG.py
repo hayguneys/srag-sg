@@ -602,7 +602,7 @@ with tab1:
     }
 
     _faixa_view = st.radio(
-        "Visualização", ["Total", "Faixa Etária", "Sexo", "Raça/Cor"],
+        "Visualização", ["Total", "Faixa Etária", "Sexo"],
         horizontal=True, key="srag_faixa_view", label_visibility="collapsed",
     )
 
@@ -675,29 +675,6 @@ with tab1:
             _bar_layout(_fig_sx)
             add_ma_overlay(_fig_sx, _agg_sx)
             st.plotly_chart(_fig_sx, width='stretch')
-    else:  # Raça/Cor
-        _rc = df_view.dropna(subset=["DT_SIN_PRI"]).copy()
-        _rc["RACA_LABEL"] = pd.to_numeric(_rc["CS_RACA"], errors="coerce").map(_SRAG_RACA_LABELS)
-        _rc = _rc.dropna(subset=["RACA_LABEL"])
-        if _rc.empty:
-            st.info("Sem dados de raça/cor.")
-        else:
-            _yr_rc, _wk_rc = paho_year_week(_rc["DT_SIN_PRI"])
-            _rc["semana"]      = "SE " + _wk_rc.astype(str).str.zfill(2) + "/" + _yr_rc.astype(str)
-            _rc["semana_sort"] = _yr_rc * 100 + _wk_rc
-            _agg_rc = _rc.groupby(["semana", "semana_sort", "RACA_LABEL"]).size().reset_index(name="n")
-            _ord_rc = _agg_rc[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
-            _fig_rc = px.bar(
-                _agg_rc, x="semana", y="n", color="RACA_LABEL",
-                color_discrete_map=RACA_COLORS,
-                title=f"Total de {_unidade} por Raça/Cor por Semana Epidemiológica",
-                labels={"semana": "Semana Epidemiológica", "n": f"Nº {_unidade}", "RACA_LABEL": "Raça/Cor"},
-                category_orders={"semana": _ord_rc, "RACA_LABEL": list(_SRAG_RACA_LABELS.values())},
-            )
-            _add_pct_hover(_fig_rc, _agg_rc, unit=_unit_lc)
-            _bar_layout(_fig_rc)
-            add_ma_overlay(_fig_rc, _agg_rc)
-            st.plotly_chart(_fig_rc, width='stretch')
     st.caption(f"Fonte: {_FONTE_SRAG}")
 
     st.markdown("---")
