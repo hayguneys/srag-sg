@@ -82,12 +82,60 @@ def render_epiweek_slider(
     start: tuple[int, int] = EPIWEEK_MIN,
     end: tuple[int, int] = EPIWEEK_MAX,
 ) -> tuple[tuple[int, int], tuple[int, int]]:
-    """Render an SE/Ano range select_slider; return (se_lo, se_hi) tuples."""
+    """Render year/week selectboxes + SE/Ano range slider; return (se_lo, se_hi).
+
+    The selectboxes (above) and the slider (below) are kept in sync via
+    session_state: selectbox changes pre-seed the slider key; slider changes
+    are read back into the selectboxes on the next render.
+    """
     opts = epiweek_options(start, end)
     labels = [epiweek_label(y, w) for y, w in opts]
-    lbl_lo, lbl_hi = st.select_slider(
-        label, options=labels, value=(labels[0], labels[-1]), key=key,
-    )
+    all_years = sorted(set(y for y, w in opts))
+
+    # Read current position from session_state (set by slider or prior selectbox)
+    curr_lo_lbl = labels[0]
+    curr_hi_lbl = labels[-1]
+    if key in st.session_state:
+        val = st.session_state[key]
+        if isinstance(val, (list, tuple)) and len(val) == 2:
+            lo, hi = val
+            if lo in labels: curr_lo_lbl = lo
+            if hi in labels: curr_hi_lbl = hi
+    curr_lo_y, curr_lo_w = opts[labels.index(curr_lo_lbl)]
+    curr_hi_y, curr_hi_w = opts[labels.index(curr_hi_lbl)]
+
+    # --- Selectboxes --------------------------------------------------------
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        sel_lo_y = st.selectbox(
+            "Ano inicial", all_years,
+            index=all_years.index(curr_lo_y) if curr_lo_y in all_years else 0,
+            key=f"{key}_sel_lo_y",
+        )
+    lo_weeks = [w for y, w in opts if y == sel_lo_y]
+    with c2:
+        lo_w_idx = lo_weeks.index(curr_lo_w) if (sel_lo_y == curr_lo_y and curr_lo_w in lo_weeks) else 0
+        sel_lo_w = st.selectbox("SE inicial", lo_weeks, index=lo_w_idx, key=f"{key}_sel_lo_w")
+    with c3:
+        sel_hi_y = st.selectbox(
+            "Ano final", all_years,
+            index=all_years.index(curr_hi_y) if curr_hi_y in all_years else len(all_years) - 1,
+            key=f"{key}_sel_hi_y",
+        )
+    hi_weeks = [w for y, w in opts if y == sel_hi_y]
+    with c4:
+        hi_w_idx = hi_weeks.index(curr_hi_w) if (sel_hi_y == curr_hi_y and curr_hi_w in hi_weeks) else len(hi_weeks) - 1
+        sel_hi_w = st.selectbox("SE final", hi_weeks, index=hi_w_idx, key=f"{key}_sel_hi_w")
+
+    # Sync selectbox selection → slider state (clamp lo ≤ hi)
+    new_lo = epiweek_label(sel_lo_y, sel_lo_w)
+    new_hi = epiweek_label(sel_hi_y, sel_hi_w)
+    if labels.index(new_lo) > labels.index(new_hi):
+        new_lo, new_hi = new_hi, new_lo
+    st.session_state[key] = (new_lo, new_hi)
+
+    # --- Slider -------------------------------------------------------------
+    lbl_lo, lbl_hi = st.select_slider(label, options=labels, key=key)
     return opts[labels.index(lbl_lo)], opts[labels.index(lbl_hi)]
 
 
