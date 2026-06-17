@@ -428,7 +428,6 @@ with tab1:
         "Influenza A (H3N2)",
         "Influenza A não subtipado",
         "Inconclusivo",
-        "Influenza A",
         "Influenza B",
     ]
 
@@ -442,9 +441,8 @@ with tab1:
         _flu = _flu[_flu["FIN_FLU"].isin([1, 2])]
         _flu["FIN_SUBT"] = pd.to_numeric(_flu.get("FIN_SUBT"), errors="coerce")
         _sub_label = _flu["FIN_SUBT"].map(FIN_SUBT_LABELS)
-        # Influenza A → subtype label (or generic "Influenza A"); B → "Influenza B".
         _flu["FLU_LABEL"] = _sub_label.where(_flu["FIN_FLU"] == 1, "Influenza B")
-        _flu.loc[(_flu["FIN_FLU"] == 1) & _flu["FLU_LABEL"].isna(), "FLU_LABEL"] = "Influenza A"
+        _flu.loc[(_flu["FIN_FLU"] == 1) & _flu["FLU_LABEL"].isna(), "FLU_LABEL"] = "Influenza A não subtipado"
 
         if _flu.empty:
             st.info("Sem dados de tipo de influenza para os filtros selecionados.")
@@ -492,7 +490,6 @@ with tab1:
         "Influenza A (H1N1)pdm09":   "#E45756",
         "Influenza A (H3N2)":        "#F58518",
         "Influenza A não subtipado": "#9C9C9C",
-        "Influenza A":               "#D62728",
         "Influenza B":               "#4C78A8",
         "Inconclusivo":              "#BAB0AC",
         # Other viruses
@@ -509,7 +506,7 @@ with tab1:
     }
     _SG_VIRUS_ORDER = [
         "Influenza A (H1N1)pdm09", "Influenza A (H3N2)",
-        "Influenza A não subtipado", "Influenza A", "Influenza B", "Inconclusivo",
+        "Influenza A não subtipado", "Influenza B", "Inconclusivo",
         "VSR", "SARS-CoV-2", "Adenovírus",
         "Parainfluenza 1", "Parainfluenza 2", "Parainfluenza 3", "Parainfluenza 4",
         "Metapneumovírus", "Rinovírus", "Bocavírus",
@@ -526,7 +523,7 @@ with tab1:
             _flu_v["FIN_SUBT"] = pd.to_numeric(_flu_v.get("FIN_SUBT"), errors="coerce")
             _sub_lbl = _flu_v["FIN_SUBT"].map(FIN_SUBT_LABELS)
             _flu_v["virus"] = _sub_lbl.where(_flu_v["FIN_FLU"] == 1, "Influenza B")
-            _flu_v.loc[(_flu_v["FIN_FLU"] == 1) & _flu_v["virus"].isna(), "virus"] = "Influenza A"
+            _flu_v.loc[(_flu_v["FIN_FLU"] == 1) & _flu_v["virus"].isna(), "virus"] = "Influenza A não subtipado"
             _vrows.append(_flu_v[["DT_PRISINT", "virus"]].copy())
 
     # Other viruses: IFI + PCR deduplicated per patient per label
