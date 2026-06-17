@@ -128,7 +128,7 @@ else:
     _col = "taxa" if _view.startswith("Taxa") else "n"
     components.html(
         _folium_choropleth_distritos(_dist_data, color_col=_col),
-        height=540, scrolling=False,
+        height=920, scrolling=False,
     )
     st.caption(
         "Fonte: BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndrome "
