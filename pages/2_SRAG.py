@@ -961,8 +961,8 @@ with tab2:
 with tab3:
     st.markdown("### Nowcasting + Forecasting — SRAG")
     st.caption(
-        "Modelo INLA estruturado por idade (`bins_age = '10 years'`), "
-        "`wdw = 230` semanas, `K = 4` semanas de forecast."
+        "Modelo INLA binomial negativo usando as variáveis: idade, atraso de notificação, casos por semana. "
+        "Previsão de forecasting para as próximas 4 semanas depois da última data disponível."
     )
     embed_html_plot("nowcasting_srag.html", height=750, fix_legend=True)
     st.caption(f"Fonte: {_FONTE_SRAG}")
