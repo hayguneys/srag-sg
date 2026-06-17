@@ -677,50 +677,68 @@ with tab2:
     st.markdown("---")
     st.markdown("### Positividade por Tipo de Vírus")
 
-    SG_VIRUS_MAP = {
-        "IFI_FLU":   "Influenza",
-        "PCR_FLU":   "Influenza",
-        "IFI_VRS":   "VSR",
-        "PCR_VRS":   "VSR",
-        "IFI_SARS2": "SARS-CoV-2",
-        "PCR_SARS2": "SARS-CoV-2",
-        "IFI_ADENO": "Adenovírus",
-        "PCR_ADENO": "Adenovírus",
-        "IFI_PARA1": "Parainfluenza 1",
-        "PCR_PARA1": "Parainfluenza 1",
-        "IFI_PARA2": "Parainfluenza 2",
-        "PCR_PARA2": "Parainfluenza 2",
-        "IFI_PARA3": "Parainfluenza 3",
-        "PCR_PARA3": "Parainfluenza 3",
-        "IFI_PARA4": "Parainfluenza 4",
-        "PCR_PARA4": "Parainfluenza 4",
-        "PCR_METAP": "Metapneumovírus",
-        "PCR_RINO":  "Rinovírus",
-        "PCR_BOCA":  "Bocavírus",
+    _T2_VIRUS_GROUPS = {
+        "VSR":             ["IFI_VRS",   "PCR_VRS"],
+        "SARS-CoV-2":      ["IFI_SARS2", "PCR_SARS2"],
+        "Adenovírus":      ["IFI_ADENO", "PCR_ADENO"],
+        "Parainfluenza 1": ["IFI_PARA1", "PCR_PARA1"],
+        "Parainfluenza 2": ["IFI_PARA2", "PCR_PARA2"],
+        "Parainfluenza 3": ["IFI_PARA3", "PCR_PARA3"],
+        "Parainfluenza 4": ["IFI_PARA4", "PCR_PARA4"],
+        "Metapneumovírus": ["PCR_METAP"],
+        "Rinovírus":       ["PCR_RINO"],
+        "Bocavírus":       ["PCR_BOCA"],
     }
-    SG_ALL_VIRUS_COLORS = {
-        "Influenza":       "#EECA3B",
+    _T2_VIRUS_COLORS = {
+        "Influenza A (H1N1)pdm09":   "#E45756",
+        "Influenza A (H3N2)":        "#F58518",
+        "Influenza A não subtipado": "#9C9C9C",
+        "Influenza B":               "#4C78A8",
+        "Inconclusivo":              "#BAB0AC",
         "VSR":             "#B279A2",
         "SARS-CoV-2":      "#54A24B",
         "Adenovírus":      "#72B7B2",
-        "Parainfluenza 1": "#4C78A8",
-        "Parainfluenza 2": "#F58518",
-        "Parainfluenza 3": "#E45756",
-        "Parainfluenza 4": "#9C9C9C",
-        "Metapneumovírus": "#FF9DA6",
-        "Rinovírus":       "#BAB0AC",
-        "Bocavírus":       "#636363",
+        "Parainfluenza 1": "#FF9DA6",
+        "Parainfluenza 2": "#EECA3B",
+        "Parainfluenza 3": "#8FBC8F",
+        "Parainfluenza 4": "#B0C4DE",
+        "Metapneumovírus": "#DEB887",
+        "Rinovírus":       "#636363",
+        "Bocavírus":       "#20B2AA",
     }
+    _T2_VIRUS_ORDER = [
+        "Influenza A (H1N1)pdm09", "Influenza A (H3N2)",
+        "Influenza A não subtipado", "Influenza B", "Inconclusivo",
+        "VSR", "SARS-CoV-2", "Adenovírus",
+        "Parainfluenza 1", "Parainfluenza 2", "Parainfluenza 3", "Parainfluenza 4",
+        "Metapneumovírus", "Rinovírus", "Bocavírus",
+    ]
 
     _sg_vrows = []
-    for _col, _label in SG_VIRUS_MAP.items():
-        if _col not in _df_t2.columns:
+
+    # Influenza subtypes via FIN_FLU / FIN_SUBT
+    if "FIN_FLU" in _df_t2.columns:
+        _flu_t2 = _df_t2.copy()
+        _flu_t2["FIN_FLU"] = pd.to_numeric(_flu_t2["FIN_FLU"], errors="coerce")
+        _flu_t2 = _flu_t2[_flu_t2["FIN_FLU"].isin([1, 2]) & _flu_t2["DT_PRISINT"].notna()].copy()
+        if not _flu_t2.empty:
+            _flu_t2["FIN_SUBT"] = pd.to_numeric(_flu_t2.get("FIN_SUBT"), errors="coerce")
+            _sub_lbl_t2 = _flu_t2["FIN_SUBT"].map(FIN_SUBT_LABELS)
+            _flu_t2["virus"] = _sub_lbl_t2.where(_flu_t2["FIN_FLU"] == 1, "Influenza B")
+            _flu_t2.loc[(_flu_t2["FIN_FLU"] == 1) & _flu_t2["virus"].isna(), "virus"] = "Influenza A não subtipado"
+            _sg_vrows.append(_flu_t2[["DT_PRISINT", "virus"]].copy())
+
+    # Other viruses: IFI + PCR deduplicated per patient per label
+    for _t2lbl, _t2cols in _T2_VIRUS_GROUPS.items():
+        _avail2 = [c for c in _t2cols if c in _df_t2.columns]
+        if not _avail2:
             continue
-        _tmp = _df_t2[["DT_PRISINT", _col]].copy()
-        _tmp[_col] = pd.to_numeric(_tmp[_col], errors="coerce")
-        _pos = _tmp[_tmp[_col] >= 1][["DT_PRISINT"]].copy()
-        _pos["virus"] = _label
-        _sg_vrows.append(_pos)
+        _vmask2 = pd.concat(
+            [pd.to_numeric(_df_t2[c], errors="coerce") >= 1 for c in _avail2], axis=1
+        ).any(axis=1)
+        _vtmp2 = _df_t2.loc[_vmask2 & _df_t2["DT_PRISINT"].notna(), ["DT_PRISINT"]].copy()
+        _vtmp2["virus"] = _t2lbl
+        _sg_vrows.append(_vtmp2)
 
     if not _sg_vrows:
         st.info("Nenhuma coluna de teste encontrada.")
@@ -730,7 +748,7 @@ with tab2:
         _sg_vlong["semana"]      = "SE " + _wk_sgv.astype(str).str.zfill(2) + "/" + _yr_sgv.astype(str)
         _sg_vlong["semana_sort"] = _yr_sgv * 100 + _wk_sgv
 
-        _sg_all_virus = sorted(_sg_vlong["virus"].unique())
+        _sg_all_virus = [l for l in _T2_VIRUS_ORDER if l in _sg_vlong["virus"].unique()]
         _sg_virus_sel = st.selectbox(
             "Vírus", ["Todos os Vírus"] + _sg_all_virus,
             key="sg_virus_sel",
@@ -742,7 +760,7 @@ with tab2:
         _sg_virus_order = _sg_all_virus if _sg_virus_sel == "Todos os Vírus" else [_sg_virus_sel]
         _sg_fig_v = px.bar(
             _sg_agg_v, x="semana", y="n", color="virus",
-            color_discrete_map=SG_ALL_VIRUS_COLORS,
+            color_discrete_map=_T2_VIRUS_COLORS,
             title="Testes Positivos por Vírus e Semana Epidemiológica",
             labels={"semana": "Semana Epidemiológica", "n": "Nº Testes Positivos", "virus": "Vírus"},
             category_orders={"semana": _sg_ord_v, "virus": _sg_virus_order},
