@@ -34,7 +34,7 @@ st.caption(
     "ausente. Município de notificação = Recife.*"
 )
 
-_FONTE_ESUS = "BRASIL. Ministério da Saúde. eSUS-Notifica. Brasília, 2026."
+_FONTE_ESUS = "SESAU/SEVS/GGAM/GEVEPI/DDT/ESUS-NOTIFICA"
 
 # --- Load data — município de notificação = Recife --------------------------
 df_raw = load_esus_page()
