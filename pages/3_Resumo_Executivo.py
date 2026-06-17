@@ -8,7 +8,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from utils.helpers import (
-    load_sg, load_srag_withna, load_esus_kpi,
+    load_srag_withna, load_esus_kpi,
     render_kpis, fmt_int, paho_year_week,
     embed_html_plot,
     load_bairro_distrito, _folium_choropleth_distritos, _DISTRITO_NAMES,
@@ -60,58 +60,30 @@ st.caption("Fonte: BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de
 st.markdown("---")
 
 # ============================================================
-# SECTION 3 — Taxa de Incidência por Distrito Sanitário (SG + SRAG)
+# SECTION 3 — Taxa de Incidência por Distrito Sanitário (SRAG)
 # ============================================================
 st.markdown("## Taxa de Incidência por Distrito Sanitário — Recife")
-st.caption(
-    "Casos SG + SRAG com bairro de residência em Recife, agregados por Distrito "
-    "Sanitário (DS I–DS VIII). Período 2022–2026, cap SE16/2026. "
-    "Taxa por 100.000 habitantes — população IBGE Censo 2022."
-)
 
 
 @st.cache_data(show_spinner="Calculando incidência por distrito…")
 def _build_distrito_data():
     bairro_ds = load_bairro_distrito()
-
-    # --- SG (município de residência = Recife, data dos primeiros sintomas) --
-    _sg = load_sg()
-    _sg = _sg[_sg["COD_MUNRES"] == 261160].copy()
-    _sg = _sg[_sg["DT_PRISINT"].dt.year.between(2022, 2026)].copy()
-    _yr, _wk = paho_year_week(_sg["DT_PRISINT"])
-    _sg = _sg[~((_yr == 2026) & (_wk > 16))]
-    if "NOM_BAIRRO" in _sg.columns:
-        _sg["bairro"] = _sg["NOM_BAIRRO"].str.upper().str.strip().fillna("")
-        _sg = _sg[_sg["bairro"] != ""]
-        _sg = _sg.merge(bairro_ds, on="bairro", how="left").dropna(subset=["distrito"])
-        sg_agg = _sg.groupby("distrito").size().reset_index(name="sg")
-    else:
-        sg_agg = pd.DataFrame(columns=["distrito", "sg"])
-
-    # --- SRAG (município de residência = Recife, data dos primeiros sintomas) --
     _sr = load_srag_withna()
     _sr = _sr[_sr["ID_MN_RESI"] == "RECIFE"].copy()
     _sr = _sr[_sr["DT_SIN_PRI"].dt.year.between(2022, 2026)].copy()
-    _yr2, _wk2 = paho_year_week(_sr["DT_SIN_PRI"])
-    _sr = _sr[~((_yr2 == 2026) & (_wk2 > 16))]
-    if "NM_BAIRRO" in _sr.columns:
-        _sr["bairro"] = _sr["NM_BAIRRO"].str.upper().str.strip().fillna("")
-        _sr = _sr[_sr["bairro"] != ""]
-        _sr = _sr.merge(bairro_ds, on="bairro", how="left").dropna(subset=["distrito"])
-        srag_agg = _sr.groupby("distrito").size().reset_index(name="srag")
-    else:
-        srag_agg = pd.DataFrame(columns=["distrito", "srag"])
-
-    # --- combine ----------------------------------------------------------
+    _yr, _wk = paho_year_week(_sr["DT_SIN_PRI"])
+    _sr = _sr[~((_yr == 2026) & (_wk > 16))]
+    if "NM_BAIRRO" not in _sr.columns:
+        return pd.DataFrame()
+    _sr["bairro"] = _sr["NM_BAIRRO"].str.upper().str.strip().fillna("")
+    _sr = _sr[_sr["bairro"] != ""]
+    _sr = _sr.merge(bairro_ds, on="bairro", how="left").dropna(subset=["distrito"])
+    agg = _sr.groupby("distrito").size().reset_index(name="n")
     base = pd.DataFrame({"distrito": list(_DISTRITO_NAMES.values())})
-    out = base.merge(sg_agg, on="distrito", how="left").merge(srag_agg, on="distrito", how="left")
-    out["sg"]   = out["sg"].fillna(0).astype(int)
-    out["srag"] = out["srag"].fillna(0).astype(int)
-    out["n"]    = out["sg"] + out["srag"]
-    out["pop"]  = out["distrito"].map(_DS_POP)
-    out["taxa_sg"]   = (out["sg"]   / out["pop"] * 100_000).round(1)
-    out["taxa_srag"] = (out["srag"] / out["pop"] * 100_000).round(1)
-    out["taxa"]      = (out["n"]    / out["pop"] * 100_000).round(1)
+    out = base.merge(agg, on="distrito", how="left")
+    out["n"]   = out["n"].fillna(0).astype(int)
+    out["pop"] = out["distrito"].map(_DS_POP)
+    out["taxa"] = (out["n"] / out["pop"] * 100_000).round(1)
     return out[out["n"] > 0].reset_index(drop=True)
 
 
@@ -130,8 +102,4 @@ else:
         _folium_choropleth_distritos(_dist_data, color_col=_col),
         height=920, scrolling=False,
     )
-    st.caption(
-        "Fonte: BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndrome "
-        "Gripal e Síndromes Respiratórias Agudas Graves. Brasília, 2026. · "
-        "População: IBGE, Censo Demográfico 2022."
-    )
+    st.caption("Fonte: SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP-GRIPE · Pop. IBGE Censo 2022.")
