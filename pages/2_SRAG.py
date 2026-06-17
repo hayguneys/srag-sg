@@ -997,11 +997,6 @@ with tab3:
 
     st.markdown("---")
     st.markdown("### Sazonalidade — Média Histórica por Semana Epidemiológica")
-    st.caption(
-        "Média de casos por semana epidemiológica usando todos os anos disponíveis "
-        "(2019–2026) por semana de início dos sintomas (`DT_SIN_PRI`). A faixa cinza "
-        "mostra ±1 desvio-padrão entre anos; a linha destaca o ano mais recente."
-    )
     render_seasonality_hist(df_all, onset_col="DT_SIN_PRI",
                             titulo="Sazonalidade — SRAG (média por SE, todos os anos)")
     st.caption(f"Fonte: {_FONTE_SRAG}")

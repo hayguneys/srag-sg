@@ -402,11 +402,6 @@ with tab3:
 
     st.markdown("---")
     st.markdown("### Sazonalidade — Média Histórica por Semana Epidemiológica")
-    st.caption(
-        "Média de notificações por semana epidemiológica usando todos os anos "
-        "disponíveis por data dos primeiros sintomas. A faixa cinza mostra ±1 "
-        "desvio-padrão entre anos; a linha destaca o ano mais recente."
-    )
     render_seasonality_hist(df_all, onset_col="DT_SINTOMAS",
                             value_label="Notificações",
                             titulo="Sazonalidade — eSUS (média por SE, todos os anos)")

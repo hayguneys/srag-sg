@@ -431,23 +431,23 @@ def render_ma_chart(
     st.plotly_chart(fig, width='stretch')
 
 
-# --- Seasonality histogram (média histórica por SE) ----------------------
+# --- Seasonality line (média móvel histórica por SE) ---------------------
 def render_seasonality_hist(
     df_all: pd.DataFrame,
     onset_col: str,
     titulo: str = "Sazonalidade — Média Histórica por Semana Epidemiológica",
     value_label: str = "Casos",
     highlight_year: int | None = None,
+    window: int = 4,
 ) -> None:
-    """Plot the average number of cases per epidemiological week across all years.
+    """Plot the historical seasonal profile as a moving-average line.
 
-    For every epidemiological week (SE 1…53) the bar height is the mean weekly
-    count computed over **all** years available in ``df_all`` — i.e. the typical
-    seasonal profile. Year/week combinations with no record are counted as zero
-    within each year's observed span so quiet weeks pull the average down
-    correctly. A ±1 standard-deviation band shows year-to-year variability, and
-    the most recent year (or ``highlight_year``) is overlaid as a line so the
-    current season can be compared against the historical norm.
+    For every epidemiological week (SE 1…53) the mean weekly count is computed
+    over **all** years available in ``df_all`` (quiet weeks count as zero within
+    each year's observed span), then smoothed with a centred ``window``-week
+    moving average to give the typical seasonal curve. The most recent year (or
+    ``highlight_year``) is overlaid as a dotted line so the current season can be
+    compared against the historical norm.
     """
     import plotly.graph_objects as go
 
@@ -455,7 +455,7 @@ def render_seasonality_hist(
     d[onset_col] = pd.to_datetime(d[onset_col], errors="coerce")
     d = d.dropna(subset=[onset_col])
     if d.empty:
-        st.info("Sem dados para o histograma de sazonalidade.")
+        st.info("Sem dados para o gráfico de sazonalidade.")
         return
 
     epi_year, epi_week = paho_year_week(d[onset_col])
@@ -479,50 +479,43 @@ def render_seasonality_hist(
     full["n"] = full["n"].fillna(0)
 
     season = (
-        full.groupby("week")["n"]
-        .agg(media="mean", desvio="std").reset_index().fillna({"desvio": 0})
-        .sort_values("week")
+        full.groupby("week")["n"].mean().reset_index(name="media").sort_values("week")
     )
-    season["media"] = season["media"].round(1)
-    season["hi"] = (season["media"] + season["desvio"]).round(1)
-    season["lo"] = (season["media"] - season["desvio"]).clip(lower=0).round(1)
+    # Moving average across the SE axis to smooth the historical seasonal curve.
+    season["ma"] = (
+        season["media"].rolling(window, min_periods=1, center=True).mean().round(1)
+    )
 
-    weeks = season["week"].tolist()
     fig = go.Figure()
 
-    # ±1 DP band
+    # Historical moving-average line (all years).
     fig.add_trace(go.Scatter(
-        x=weeks + weeks[::-1],
-        y=season["hi"].tolist() + season["lo"].tolist()[::-1],
-        fill="toself", fillcolor="rgba(150,150,150,0.20)",
-        line=dict(width=0), name="±1 DP (entre anos)", hoverinfo="skip",
+        x=season["week"], y=season["ma"],
+        name=f"Média móvel histórica ({y_min}–{y_max})", mode="lines",
+        line=dict(color="#4C78A8", width=2.5),
+        hovertemplate=(
+            "SE %{x}<br>Média móvel: %{y:.1f} " + value_label.lower() + "<extra></extra>"
+        ),
     ))
 
-    # Average bars
-    fig.add_trace(go.Bar(
-        x=weeks, y=season["media"],
-        name=f"Média {y_min}–{y_max}", marker_color="#72B7B2",
-        hovertemplate="SE %{x}<br>Média: %{y:.1f} " + value_label.lower() + "<extra></extra>",
-    ))
-
-    # Highlight the most recent (or requested) year for comparison.
+    # Most recent (or requested) year overlaid as a dotted line.
     hl_year = highlight_year if highlight_year is not None else y_max
     cur = counts[counts["year"] == hl_year].sort_values("week")
     if not cur.empty:
         fig.add_trace(go.Scatter(
             x=cur["week"], y=cur["n"],
-            name=f"{hl_year}", mode="lines+markers",
-            line=dict(color="#E45756", width=2), marker=dict(size=4),
+            name=f"{hl_year}", mode="lines",
+            line=dict(color="#E45756", width=2, dash="dot"),
             hovertemplate=f"SE %{{x}}/{hl_year}<br>{value_label}: %{{y}}<extra></extra>",
         ))
 
     fig.update_layout(
         title=titulo,
         xaxis=dict(title="Semana Epidemiológica", dtick=2, tickmode="linear"),
-        yaxis=dict(title=f"Nº {value_label} (média por ano)"),
+        yaxis=dict(title=f"Nº {value_label}"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0.5, xanchor="center"),
         margin=dict(l=20, r=20, t=90, b=60),
-        height=460, plot_bgcolor="white", bargap=0.15,
+        height=460, plot_bgcolor="white",
     )
     st.plotly_chart(fig, width='stretch')
 
