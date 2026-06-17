@@ -740,9 +740,26 @@ def _folium_choropleth_distritos(data: pd.DataFrame, color_col: str = "n") -> st
         tooltip_aliases.append("Total:")
         legend_label = "Casos"
 
+    # Derive bounding box from GeoJSON so fit_bounds always shows all polygons
+    _all_coords = []
+    for _feat in geojson["features"]:
+        _g = _feat["geometry"]
+        if _g["type"] == "Polygon":
+            for _ring in _g["coordinates"]:
+                _all_coords.extend(_ring)
+        elif _g["type"] == "MultiPolygon":
+            for _poly in _g["coordinates"]:
+                for _ring in _poly:
+                    _all_coords.extend(_ring)
+    _lons_bb = [c[0] for c in _all_coords]
+    _lats_bb = [c[1] for c in _all_coords]
+    _sw = [min(_lats_bb), min(_lons_bb)]
+    _ne = [max(_lats_bb), max(_lons_bb)]
+    _center = [(_sw[0] + _ne[0]) / 2, (_sw[1] + _ne[1]) / 2]
+
     m = folium.Map(
-        location=[-8.1891, -34.8711],
-        zoom_start=11,
+        location=_center,
+        zoom_start=12,
         tiles="CartoDB positron",
         control_scale=True,
         min_zoom=10,
@@ -751,6 +768,7 @@ def _folium_choropleth_distritos(data: pd.DataFrame, color_col: str = "n") -> st
         min_lat=-8.25, max_lat=-7.85,
         min_lon=-35.15, max_lon=-34.70,
     )
+    m.fit_bounds([_sw, _ne])
 
     Choropleth(
         geo_data=geojson,
