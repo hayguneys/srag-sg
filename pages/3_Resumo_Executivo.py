@@ -162,7 +162,7 @@ st.markdown("---")
 # ============================================================
 # SECTION 3 — Taxa de Incidência por Distrito Sanitário (SRAG)
 # ============================================================
-st.markdown("## Taxa de Incidência por Distrito Sanitário — Recife")
+st.markdown("## Taxa de Incidência de SRAG por Distrito Sanitário — Recife")
 
 
 @st.cache_data(show_spinner="Calculando incidência por distrito…")
