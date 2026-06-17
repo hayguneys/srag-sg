@@ -269,6 +269,22 @@ def period_compare_label(se_lo: tuple[int, int], se_hi: tuple[int, int]) -> str:
     return f"{cur} vs {prev}"
 
 
+def _se_span_label(se_lo: tuple[int, int], se_hi: tuple[int, int]) -> str:
+    """Exact SE span, e.g. "SE 01/2026 – SE 16/2026" (or a single SE)."""
+    lo, hi = epiweek_label(*se_lo), epiweek_label(*se_hi)
+    return lo if se_lo == se_hi else f"{lo} – {hi}"
+
+
+def period_compare_se_label(se_lo: tuple[int, int], se_hi: tuple[int, int]) -> str:
+    """Exact SE ranges compared: the selected span vs. the same span one year back.
+
+    e.g. "SE 01/2026 – SE 16/2026 vs SE 01/2025 – SE 16/2025".
+    """
+    cur  = _se_span_label(se_lo, se_hi)
+    prev = _se_span_label((se_lo[0] - 1, se_lo[1]), (se_hi[0] - 1, se_hi[1]))
+    return f"{cur} vs {prev}"
+
+
 def format_kpi_delta(cur: float, prev: float, compare_label: str) -> str | None:
     """Signed percent change vs. the previous period, annotated with the years.
 
@@ -281,21 +297,24 @@ def format_kpi_delta(cur: float, prev: float, compare_label: str) -> str | None:
     return f"{pct:+.0f}% ({compare_label})"
 
 
-def render_kpis(kpis: list[tuple[str, str] | tuple[str, str, str]]) -> None:
-    """Render a row of KPI cards. Each kpi is (label, value) or (label, value, delta).
+def render_kpis(kpis: list[tuple]) -> None:
+    """Render a row of KPI cards.
 
-    When a delta string is provided it is passed to ``st.metric``'s native
-    ``delta`` slot, which draws a coloured ↑/↓ arrow based on its sign.
+    Each kpi is ``(label, value)``, ``(label, value, delta)``, or
+    ``(label, value, delta, help)``. A delta string is passed to
+    ``st.metric``'s native ``delta`` slot (coloured ↑/↓ arrow by sign); the
+    optional help text renders the hover tooltip balloon (e.g. the exact SE
+    range being compared).
     """
     cols = st.columns(len(kpis))
     for col, kpi in zip(cols, kpis):
         with col:
-            if len(kpi) == 3 and kpi[2]:
-                label, value, delta = kpi
-                st.metric(label, value, delta=delta)
+            delta = kpi[2] if len(kpi) >= 3 else None
+            help_txt = kpi[3] if len(kpi) >= 4 else None
+            if delta:
+                st.metric(kpi[0], kpi[1], delta=delta, help=help_txt)
             else:
-                label, value = kpi[0], kpi[1]
-                st.metric(label, value)
+                st.metric(kpi[0], kpi[1])
 
 
 def fmt_int(n) -> str:

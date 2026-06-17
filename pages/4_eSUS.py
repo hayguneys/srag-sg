@@ -20,7 +20,7 @@ import streamlit as st
 
 from utils.helpers import (
     load_esus_page, render_kpis, fmt_int, paho_year_week,
-    period_compare_label, format_kpi_delta,
+    period_compare_label, period_compare_se_label, format_kpi_delta,
     render_epiweek_slider, filter_epiweek, add_ma_overlay,
     render_ma_chart, render_seasonality_hist, embed_html_plot,
     render_forecast_table, PLOTS_DIR, ESUS_EPIWEEK_MIN,
@@ -154,12 +154,13 @@ with tab1:
         pct_pos = 0.0
 
     _cmp = period_compare_label(_se_lo, _se_hi)
+    _cmp_se = period_compare_se_label(_se_lo, _se_hi)
     delta_notif = format_kpi_delta(total_notif, len(df_prev), _cmp)
     delta_pos   = format_kpi_delta(total_pos, total_pos_prev, _cmp)
 
     render_kpis([
-        ("Notificações", fmt_int(total_notif), delta_notif),
-        ("Testes positivos", fmt_int(total_pos), delta_pos),
+        ("Notificações", fmt_int(total_notif), delta_notif, _cmp_se),
+        ("Testes positivos", fmt_int(total_pos), delta_pos, _cmp_se),
         ("Positividade", f"{pct_pos:.1f}%"),
     ])
     st.caption(f"Data analítica: {_sintoma_src}.")

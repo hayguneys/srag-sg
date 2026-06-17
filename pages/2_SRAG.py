@@ -13,7 +13,7 @@ from utils.helpers import (
     embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
     render_epiweek_slider, filter_epiweek, add_ma_overlay,
     render_seasonality_hist, unit_code_map, SRAG_EPIWEEK_MIN,
-    period_compare_label, format_kpi_delta,
+    period_compare_label, period_compare_se_label, format_kpi_delta,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, DATA_DIR, inject_test_frames,
 )
 
@@ -476,6 +476,7 @@ with tab1:
     _show_obitos = _evo_filter == "Óbitos"
 
     _cmp = period_compare_label(_se_lo, _se_hi)
+    _cmp_se = period_compare_se_label(_se_lo, _se_hi)
 
     def _bar_layout(fig):
         fig.update_layout(
@@ -524,9 +525,9 @@ with tab1:
         delta_masc  = format_kpi_delta(_n_masc, _n_masc_prev, _cmp)
 
         render_kpis([
-            ("Total de óbitos", fmt_int(len(_kpi_base)), delta_total),
-            ("Feminino", fmt_int(_n_fem), delta_fem),
-            ("Masculino", fmt_int(_n_masc), delta_masc),
+            ("Total de óbitos", fmt_int(len(_kpi_base)), delta_total, _cmp_se),
+            ("Feminino", fmt_int(_n_fem), delta_fem, _cmp_se),
+            ("Masculino", fmt_int(_n_masc), delta_masc, _cmp_se),
             ("Idade média", f"{_avg_age:.1f} anos"),
             ("Internados em UTI", f"{_uti_pct:.1f}%"),
         ])
@@ -542,8 +543,8 @@ with tab1:
         delta_deaths = format_kpi_delta(total_deaths, total_deaths_prev, _cmp)
 
         render_kpis([
-            ("Total de casos", fmt_int(total_cases), delta_cases),
-            ("Total de óbitos", fmt_int(total_deaths), delta_deaths),
+            ("Total de casos", fmt_int(total_cases), delta_cases, _cmp_se),
+            ("Total de óbitos", fmt_int(total_deaths), delta_deaths, _cmp_se),
         ])
 
     st.markdown("---")

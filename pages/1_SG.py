@@ -13,7 +13,7 @@ from utils.helpers import (
     embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
     render_epiweek_slider, filter_epiweek, add_ma_overlay,
     render_seasonality_hist, unit_code_map, SG_EPIWEEK_MIN,
-    period_compare_label, format_kpi_delta,
+    period_compare_label, period_compare_se_label, format_kpi_delta,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, inject_test_frames,
 )
 
@@ -186,12 +186,13 @@ with tab1:
     vac_flu_prev = int((df_prev["VACINA"] == 1).sum()) if "VACINA" in df_prev.columns else 0
 
     _cmp = period_compare_label(_se_lo, _se_hi)
+    _cmp_se = period_compare_se_label(_se_lo, _se_hi)
     delta_total = format_kpi_delta(total_cases, total_cases_prev, _cmp)
     delta_vac   = format_kpi_delta(vac_flu, vac_flu_prev, _cmp)
 
     render_kpis([
-        ("Total de casos", fmt_int(total_cases), delta_total),
-        ("Vacinação Influenza", fmt_int(vac_flu), delta_vac),
+        ("Total de casos", fmt_int(total_cases), delta_total, _cmp_se),
+        ("Vacinação Influenza", fmt_int(vac_flu), delta_vac, _cmp_se),
     ])
 
     st.markdown("---")
