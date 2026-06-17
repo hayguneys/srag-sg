@@ -57,7 +57,7 @@ _UNI_LABELS = {
     _UNI_MUNI:   "Todas as municipais",
     _UNI_EXMUNI: "Todas exceto municipais",
     _UNI_DIV:    "──────  Unidades municipais  ──────",
-    _UNI_DIV2:   "──────  Todas as unidades de notificação  ──────",
+    _UNI_DIV2:   "──────  Demais unidades  ──────",
 }
 
 # name -> unit code, and the full sorted list of notification-unit names.
