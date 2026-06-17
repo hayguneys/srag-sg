@@ -125,8 +125,8 @@ def _filtra_clinicas_sg(df, selecionadas):
         return df
     return df[mask].copy()
 
-_FONTE_SG   = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP"
-_FONTE_PROG = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP"
+_FONTE_SG   = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP-GRIPE"
+_FONTE_PROG = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP-GRIPE"
 
 # Recife total population (IBGE Censo 2022) for incidence rate per 100k
 _RECIFE_POP = 1_640_147
