@@ -473,8 +473,9 @@ with tab1:
     st.markdown("---")
     st.markdown("#### Tipo de Vírus")
 
+    # Influenza shown as subtypes/types (reuses FIN_SUBT_LABELS from above).
+    # All other viruses grouped by IFI+PCR columns (deduplicated per patient).
     _SG_VIRUS_GROUPS = {
-        "Influenza":       ["IFI_FLU",   "PCR_FLU"],
         "VSR":             ["IFI_VRS",   "PCR_VRS"],
         "SARS-CoV-2":      ["IFI_SARS2", "PCR_SARS2"],
         "Adenovírus":      ["IFI_ADENO", "PCR_ADENO"],
@@ -487,20 +488,48 @@ with tab1:
         "Bocavírus":       ["PCR_BOCA"],
     }
     _SG_VIRUS_COLORS = {
-        "Influenza":       "#EECA3B",
+        # Influenza subtypes (same palette as Tipo de Influenza chart)
+        "Influenza A (H1N1)pdm09":   "#E45756",
+        "Influenza A (H3N2)":        "#F58518",
+        "Influenza A não subtipado": "#9C9C9C",
+        "Influenza A":               "#D62728",
+        "Influenza B":               "#4C78A8",
+        "Inconclusivo":              "#BAB0AC",
+        # Other viruses
         "VSR":             "#B279A2",
         "SARS-CoV-2":      "#54A24B",
         "Adenovírus":      "#72B7B2",
-        "Parainfluenza 1": "#4C78A8",
-        "Parainfluenza 2": "#F58518",
-        "Parainfluenza 3": "#E45756",
-        "Parainfluenza 4": "#9C9C9C",
-        "Metapneumovírus": "#FF9DA6",
-        "Rinovírus":       "#BAB0AC",
-        "Bocavírus":       "#636363",
+        "Parainfluenza 1": "#FF9DA6",
+        "Parainfluenza 2": "#EECA3B",
+        "Parainfluenza 3": "#8FBC8F",
+        "Parainfluenza 4": "#B0C4DE",
+        "Metapneumovírus": "#DEB887",
+        "Rinovírus":       "#636363",
+        "Bocavírus":       "#20B2AA",
     }
+    _SG_VIRUS_ORDER = [
+        "Influenza A (H1N1)pdm09", "Influenza A (H3N2)",
+        "Influenza A não subtipado", "Influenza A", "Influenza B", "Inconclusivo",
+        "VSR", "SARS-CoV-2", "Adenovírus",
+        "Parainfluenza 1", "Parainfluenza 2", "Parainfluenza 3", "Parainfluenza 4",
+        "Metapneumovírus", "Rinovírus", "Bocavírus",
+    ]
 
     _vrows = []
+
+    # Influenza: subtype via FIN_FLU / FIN_SUBT (same logic as Tipo de Influenza)
+    if "FIN_FLU" in df_filt.columns:
+        _flu_v = df_filt.copy()
+        _flu_v["FIN_FLU"] = pd.to_numeric(_flu_v["FIN_FLU"], errors="coerce")
+        _flu_v = _flu_v[_flu_v["FIN_FLU"].isin([1, 2]) & _flu_v["DT_PRISINT"].notna()].copy()
+        if not _flu_v.empty:
+            _flu_v["FIN_SUBT"] = pd.to_numeric(_flu_v.get("FIN_SUBT"), errors="coerce")
+            _sub_lbl = _flu_v["FIN_SUBT"].map(FIN_SUBT_LABELS)
+            _flu_v["virus"] = _sub_lbl.where(_flu_v["FIN_FLU"] == 1, "Influenza B")
+            _flu_v.loc[(_flu_v["FIN_FLU"] == 1) & _flu_v["virus"].isna(), "virus"] = "Influenza A"
+            _vrows.append(_flu_v[["DT_PRISINT", "virus"]].copy())
+
+    # Other viruses: IFI + PCR deduplicated per patient per label
     for _vlabel, _vcols in _SG_VIRUS_GROUPS.items():
         _avail = [c for c in _vcols if c in df_filt.columns]
         if not _avail:
@@ -521,7 +550,7 @@ with tab1:
         _vlong["semana_sort"] = _yr_v * 100 + _wk_v
         _agg_v = _vlong.groupby(["semana", "semana_sort", "virus"]).size().reset_index(name="n")
         _ord_v = _agg_v[["semana", "semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
-        _present_v = [l for l in _SG_VIRUS_GROUPS if l in _agg_v["virus"].unique()]
+        _present_v = [l for l in _SG_VIRUS_ORDER if l in _agg_v["virus"].unique()]
         _fig_v = px.bar(
             _agg_v, x="semana", y="n", color="virus",
             color_discrete_map=_SG_VIRUS_COLORS,
