@@ -775,7 +775,27 @@ def _folium_choropleth_distritos(data: pd.DataFrame, color_col: str = "n") -> st
         popup=folium.GeoJsonPopup(fields=tooltip_fields, aliases=tooltip_aliases),
     ).add_to(m)
 
-    # White district name labels at polygon centroids
+    def _poly_centroid(ring):
+        """Signed-area centroid of a closed polygon ring [[lon, lat], ...]."""
+        n = len(ring)
+        A = cx = cy = 0.0
+        for i in range(n - 1):
+            x0, y0 = ring[i][0], ring[i][1]
+            x1, y1 = ring[i + 1][0], ring[i + 1][1]
+            cross = x0 * y1 - x1 * y0
+            A  += cross
+            cx += (x0 + x1) * cross
+            cy += (y0 + y1) * cross
+        A *= 0.5
+        if abs(A) < 1e-12:
+            lons = [c[0] for c in ring]
+            lats = [c[1] for c in ring]
+            return sum(lats) / len(lats), sum(lons) / len(lons)
+        cx /= 6 * A
+        cy /= 6 * A
+        return cy, cx  # (lat, lon)
+
+    # White district name labels at true polygon centroids
     for feat in geojson["features"]:
         _code = feat["properties"].get("cdistscodi", 0)
         _dname = _DISTRITO_NAMES.get(_code)
@@ -785,11 +805,11 @@ def _folium_choropleth_distritos(data: pd.DataFrame, color_col: str = "n") -> st
         if _geom["type"] == "Polygon":
             _ring = _geom["coordinates"][0]
         elif _geom["type"] == "MultiPolygon":
+            # pick the polygon with the largest area (most coords as proxy)
             _ring = max(_geom["coordinates"], key=lambda p: len(p[0]))[0]
         else:
             continue
-        _clat = sum(c[1] for c in _ring) / len(_ring)
-        _clon = sum(c[0] for c in _ring) / len(_ring)
+        _clat, _clon = _poly_centroid(_ring)
         folium.Marker(
             location=[_clat, _clon],
             icon=folium.DivIcon(
