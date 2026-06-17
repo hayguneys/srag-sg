@@ -129,7 +129,7 @@ def _filtra_clinicas_srag(df, selecionadas):
     return df[mask].copy()
 
 
-_FONTE_SRAG = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP"
+_FONTE_SRAG = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP-GRIPE"
 _RECIFE_POP = 1_640_147
 
 if st.session_state.pop("srag_goto_nowcasting", False):
