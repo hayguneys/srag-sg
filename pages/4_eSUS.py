@@ -25,8 +25,8 @@ from utils.helpers import (
     render_forecast_table, PLOTS_DIR, ESUS_EPIWEEK_MIN,
 )
 
-st.set_page_config(page_title="e-SUS", page_icon="🧬", layout="wide")
-st.title("🧬 e-SUS Notifica — COVID-19")
+st.set_page_config(page_title="Covid-19", page_icon="🧬", layout="wide")
+st.title("🧬 Covid-19 — e-SUS Notifica")
 st.caption(
     "*Notificações de Síndrome Gripal no eSUS-Notifica (COVID-19). Eixo temporal "
     "pela data dos primeiros sintomas, preenchida pela data de notificação quando "
