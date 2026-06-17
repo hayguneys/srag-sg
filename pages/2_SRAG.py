@@ -899,11 +899,24 @@ with tab2:
         st.caption(f"Fonte: {_FONTE_SRAG}")
 
     st.markdown("---")
-    st.markdown("### Teste Antigênico — Positividade por Tipo de Vírus")
-    st.caption("Conta testes positivos por vírus por semana de início dos sintomas (2022–2026).")
+    st.markdown("### Positividade por Tipo de Vírus")
+
+    ALL_VIRUS_COLORS = {
+        "SARS-CoV-2":               "#EECA3B",
+        "VSR":                      "#B279A2",
+        "Parainfluenza 1":          "#4C78A8",
+        "Parainfluenza 2":          "#F58518",
+        "Parainfluenza 3":          "#E45756",
+        "Parainfluenza 4":          "#72B7B2",
+        "Adenovírus":               "#54A24B",
+        "Metapneumovírus":          "#FF9DA6",
+        "Outro vírus respiratório": "#9C9C9C",
+        "Bocavírus":                "#BAB0AC",
+        "Rinovírus":                "#636363",
+    }
 
     _vrows = []
-    for _col, _label in VIRUS_COLS.items():
+    for _col, _label in {**VIRUS_COLS, **PCR_COLS}.items():
         if _col not in _vbase.columns:
             continue
         _tmp = _vbase[["DT_SIN_PRI", _col]].copy()
@@ -913,59 +926,33 @@ with tab2:
         _vrows.append(_pos)
 
     if not _vrows:
-        st.info("Nenhuma coluna de teste antigênico encontrada.")
+        st.info("Nenhuma coluna de teste encontrada.")
     else:
         _vlong = pd.concat(_vrows, ignore_index=True).dropna(subset=["DT_SIN_PRI"])
         _yr_v, _wk_v = paho_year_week(_vlong["DT_SIN_PRI"])
         _vlong["semana"]      = "SE " + _wk_v.astype(str).str.zfill(2) + "/" + _yr_v.astype(str)
         _vlong["semana_sort"] = _yr_v * 100 + _wk_v
-        _agg_v = _vlong.groupby(["semana", "semana_sort", "virus"]).size().reset_index(name="n")
-        _ord_v = _agg_v[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
+
+        _all_virus_labels = sorted(_vlong["virus"].unique())
+        _virus_sel = st.selectbox(
+            "Vírus", ["Todos os Vírus"] + _all_virus_labels,
+            key="srag_virus_sel",
+        )
+
+        _vfilt = _vlong if _virus_sel == "Todos os Vírus" else _vlong[_vlong["virus"] == _virus_sel]
+        _agg_v = _vfilt.groupby(["semana", "semana_sort", "virus"]).size().reset_index(name="n")
+        _ord_v = _agg_v[["semana", "semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
+        _virus_order = _all_virus_labels if _virus_sel == "Todos os Vírus" else [_virus_sel]
         _fig_v = px.bar(
             _agg_v, x="semana", y="n", color="virus",
-            color_discrete_map=VIRUS_COLORS,
-            title="Testes Antigênicos Positivos por Vírus e Semana Epidemiológica",
+            color_discrete_map=ALL_VIRUS_COLORS,
+            title="Testes Positivos por Vírus e Semana Epidemiológica",
             labels={"semana": "Semana Epidemiológica", "n": "Nº Testes Positivos", "virus": "Vírus"},
-            category_orders={"semana": _ord_v, "virus": list(VIRUS_COLS.values())},
+            category_orders={"semana": _ord_v, "virus": _virus_order},
         )
         _add_pct_hover(_fig_v, _agg_v, unit="testes positivos")
         _bar_layout(_fig_v)
         st.plotly_chart(_fig_v, width='stretch')
-        st.caption(f"Fonte: {_FONTE_SRAG}")
-
-    st.markdown("---")
-    st.markdown("### PCR — Positividade por Tipo de Vírus")
-    st.caption("Conta testes PCR positivos por vírus por semana de início dos sintomas (2022–2026).")
-
-    _prows = []
-    for _col, _label in PCR_COLS.items():
-        if _col not in _vbase.columns:
-            continue
-        _tmp = _vbase[["DT_SIN_PRI", _col]].copy()
-        _tmp[_col] = pd.to_numeric(_tmp[_col], errors="coerce")
-        _pos = _tmp[_tmp[_col] == 1][["DT_SIN_PRI"]].copy()
-        _pos["virus"] = _label
-        _prows.append(_pos)
-
-    if not _prows:
-        st.info("Nenhuma coluna de PCR encontrada.")
-    else:
-        _plong = pd.concat(_prows, ignore_index=True).dropna(subset=["DT_SIN_PRI"])
-        _yr_p, _wk_p = paho_year_week(_plong["DT_SIN_PRI"])
-        _plong["semana"]      = "SE " + _wk_p.astype(str).str.zfill(2) + "/" + _yr_p.astype(str)
-        _plong["semana_sort"] = _yr_p * 100 + _wk_p
-        _agg_p = _plong.groupby(["semana", "semana_sort", "virus"]).size().reset_index(name="n")
-        _ord_p = _agg_p[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
-        _fig_p = px.bar(
-            _agg_p, x="semana", y="n", color="virus",
-            color_discrete_map=PCR_COLORS,
-            title="Testes PCR Positivos por Vírus e Semana Epidemiológica",
-            labels={"semana": "Semana Epidemiológica", "n": "Nº Testes Positivos", "virus": "Vírus"},
-            category_orders={"semana": _ord_p, "virus": list(PCR_COLS.values())},
-        )
-        _add_pct_hover(_fig_p, _agg_p, unit="testes positivos")
-        _bar_layout(_fig_p)
-        st.plotly_chart(_fig_p, width='stretch')
         st.caption(f"Fonte: {_FONTE_SRAG}")
 
 # ============================================================
