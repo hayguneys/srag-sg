@@ -486,90 +486,8 @@ with tab2:
     _df_t2 = filter_epiweek(df_all, "DT_PRISINT", _t2_se_lo, _t2_se_hi)
     _df_t2 = _filtra_clinicas_sg(_df_t2, _t2_unit)
 
-    def positividade_chart(
-        source: pd.DataFrame,
-        total_col: str, total_val,
-        pos_col: str,   pos_val,
-        bar_name: str,  bar_color: str,
-        titulo: str,
-        group_weeks: int = 1,
-    ):
-        base = source.dropna(subset=["DT_PRISINT"]).copy()
-        base[total_col] = pd.to_numeric(base[total_col], errors="coerce")
-        base[pos_col]   = pd.to_numeric(base[pos_col],   errors="coerce")
-        base = base[base[total_col] == total_val]
-
-        if base.empty:
-            st.info(f"Sem dados para {titulo}.")
-            return
-
-        base = base.copy()
-        _epi_yr, _epi_wk = paho_year_week(base["DT_PRISINT"])
-
-        if group_weeks == 1:
-            base["semana"]      = "SE " + _epi_wk.astype(str).str.zfill(2) + "/" + _epi_yr.astype(str)
-            base["semana_sort"] = _epi_yr * 100 + _epi_wk
-        else:
-            period  = (_epi_wk - 1) // group_weeks
-            start_w = period * group_weeks + 1
-            end_w   = (period + 1) * group_weeks
-            base["semana"]      = ("SE " + start_w.astype(str).str.zfill(2)
-                                   + "-" + end_w.astype(str).str.zfill(2)
-                                   + "/" + _epi_yr.astype(str))
-            base["semana_sort"] = _epi_yr * 100 + period
-
-        base["positivo"] = base[pos_col] == pos_val
-
-        agg = (
-            base.groupby(["semana", "semana_sort"])
-                .agg(total=("positivo", "count"), positivos=("positivo", "sum"))
-                .reset_index()
-                .sort_values("semana_sort")
-        )
-        agg["pct"] = (agg["positivos"] / agg["total"] * 100).round(1)
-        semana_order = agg["semana"].tolist()
-
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=agg["semana"], y=agg["total"],
-            name=bar_name, marker_color=bar_color,
-            hovertemplate="%{x}<br>Testes: %{y}<extra></extra>",
-        ))
-        fig.add_trace(go.Scatter(
-            x=agg["semana"], y=agg["pct"],
-            name="% Positivos",
-            mode="lines+markers",
-            line=dict(color="#E45756", width=2),
-            marker=dict(size=5),
-            yaxis="y2",
-            hovertemplate="%{x}<br>Positividade: %{y:.1f}%<extra></extra>",
-        ))
-        fig.update_layout(
-            title=titulo,
-            xaxis=dict(
-                categoryorder="array", categoryarray=semana_order,
-                tickangle=-90, title="Semana Epidemiológica",
-            ),
-            yaxis=dict(title="Nº Testes"),
-            yaxis2=dict(
-                overlaying="y",
-                side="right",
-                range=[0, 105],
-                showticklabels=False,
-                showgrid=False,
-                zeroline=False,
-                title="",
-            ),
-            legend=dict(orientation="h", y=-0.28, x=0.5, xanchor="center"),
-            margin=dict(l=20, r=60, t=50, b=110),
-            height=580,
-            plot_bgcolor="white",
-        )
-        st.plotly_chart(fig, width='stretch')
-
-    # ---- Total (IFI + PCR) ----------------------------------------
-    st.markdown("### Total de Testes e Taxa de Positividade")
-    st.caption("Soma de testes IFI e PCR Influenza realizados e taxa de positividade combinada.")
+    # ---- Total de Testes ----------------------------------------
+    st.markdown("### Total de Testes")
 
     _sg_base = _df_t2.dropna(subset=["DT_PRISINT"]).copy()
 
@@ -577,24 +495,20 @@ with tab2:
 
     if "IFI" in _sg_base.columns and "IFI_RESUL" in _sg_base.columns:
         _ifi = _sg_base.copy()
-        _ifi["IFI"]      = pd.to_numeric(_ifi["IFI"],      errors="coerce")
-        _ifi["IFI_RESUL"]= pd.to_numeric(_ifi["IFI_RESUL"],errors="coerce")
-        _ifi_t = _ifi[_ifi["IFI"] == 1][["DT_PRISINT"]].copy()
-        _ifi_p = _ifi[(_ifi["IFI"] == 1) & (_ifi["IFI_RESUL"] == 1)][["DT_PRISINT"]].copy()
-        _tot_rows.append(_ifi_t)
-        _pos_rows.append(_ifi_p)
+        _ifi["IFI"]       = pd.to_numeric(_ifi["IFI"],       errors="coerce")
+        _ifi["IFI_RESUL"] = pd.to_numeric(_ifi["IFI_RESUL"], errors="coerce")
+        _tot_rows.append(_ifi[_ifi["IFI"] == 1][["DT_PRISINT"]].copy())
+        _pos_rows.append(_ifi[(_ifi["IFI"] == 1) & (_ifi["IFI_RESUL"] == 1)][["DT_PRISINT"]].copy())
 
     if "PCR_RESUL" in _sg_base.columns and "POS_PCRFLU" in _sg_base.columns:
         _pcr = _sg_base.copy()
-        _pcr["PCR_RESUL"] = pd.to_numeric(_pcr["PCR_RESUL"], errors="coerce")
-        _pcr["POS_PCRFLU"]= pd.to_numeric(_pcr["POS_PCRFLU"],errors="coerce")
-        _pcr_t = _pcr[_pcr["PCR_RESUL"] == 1][["DT_PRISINT"]].copy()
-        _pcr_p = _pcr[(_pcr["PCR_RESUL"] == 1) & (_pcr["POS_PCRFLU"] == 1)][["DT_PRISINT"]].copy()
-        _tot_rows.append(_pcr_t)
-        _pos_rows.append(_pcr_p)
+        _pcr["PCR_RESUL"]  = pd.to_numeric(_pcr["PCR_RESUL"],  errors="coerce")
+        _pcr["POS_PCRFLU"] = pd.to_numeric(_pcr["POS_PCRFLU"], errors="coerce")
+        _tot_rows.append(_pcr[_pcr["PCR_RESUL"] == 1][["DT_PRISINT"]].copy())
+        _pos_rows.append(_pcr[(_pcr["PCR_RESUL"] == 1) & (_pcr["POS_PCRFLU"] == 1)][["DT_PRISINT"]].copy())
 
     if not _tot_rows:
-        st.info("Sem dados de testes IFI/PCR para o período.")
+        st.info("Sem dados de testes para o período.")
     else:
         _tall_sg = pd.concat(_tot_rows, ignore_index=True).dropna(subset=["DT_PRISINT"])
         _pall_sg = pd.concat(_pos_rows, ignore_index=True).dropna(subset=["DT_PRISINT"])
@@ -613,14 +527,13 @@ with tab2:
         _tot_sg = _tot_sg.sort_values("semana_sort").reset_index(drop=True)
         _tot_sg["pct_pos"] = (_tot_sg["total_pos"] / _tot_sg["total_tested"] * 100).round(1)
 
-        _pct_max_sg   = _tot_sg["pct_pos"].max()
-        _pct_axis_max_sg = max(_pct_max_sg * 1.15, 1)
+        _pct_axis_max_sg = max(_tot_sg["pct_pos"].max() * 1.15, 1)
 
         _fig_tot_sg = go.Figure()
         _fig_tot_sg.add_trace(go.Bar(
             x=_tot_sg["semana"],
             y=_tot_sg["total_tested"],
-            name="Total Testado (IFI + PCR)",
+            name="Total Testado",
             marker_color="#72B7B2",
             yaxis="y1",
             hovertemplate="%{x}<br>Total testado: %{y}<extra></extra>",
@@ -644,7 +557,7 @@ with tab2:
             ),
         ))
         _fig_tot_sg.update_layout(
-            title="Total de Testes Realizados (IFI + PCR) e Taxa de Positividade",
+            title="Total de Testes Realizados e Taxa de Positividade por Semana Epidemiológica",
             xaxis=dict(
                 title="Semana Epidemiológica",
                 tickangle=-90,
@@ -670,20 +583,82 @@ with tab2:
         st.caption(f"Fonte: {_FONTE_SG}")
 
     st.markdown("---")
-    st.markdown("### Taxas de Positividade — PCR Influenza")
-    pcr_view = st.radio(
-        "Agrupamento", ["Semanal", "4 Semanas"],
-        horizontal=True, key="pcr_group",
-    )
-    positividade_chart(
-        _df_t2,
-        total_col="PCR_RESUL",  total_val=1,
-        pos_col="POS_PCRFLU",   pos_val=1,
-        bar_name="Testes PCR",  bar_color="#54A24B",
-        titulo="Testes PCR e Taxa de Positividade para Influenza por Semana Epidemiológica",
-        group_weeks=4 if pcr_view == "4 Semanas" else 1,
-    )
-    st.caption(f"Fonte: {_FONTE_SG}")
+    st.markdown("### Positividade por Tipo de Vírus")
+
+    SG_VIRUS_MAP = {
+        "IFI_FLU":   "Influenza",
+        "PCR_FLU":   "Influenza",
+        "IFI_VRS":   "VSR",
+        "PCR_VRS":   "VSR",
+        "IFI_SARS2": "SARS-CoV-2",
+        "PCR_SARS2": "SARS-CoV-2",
+        "IFI_ADENO": "Adenovírus",
+        "PCR_ADENO": "Adenovírus",
+        "IFI_PARA1": "Parainfluenza 1",
+        "PCR_PARA1": "Parainfluenza 1",
+        "IFI_PARA2": "Parainfluenza 2",
+        "PCR_PARA2": "Parainfluenza 2",
+        "IFI_PARA3": "Parainfluenza 3",
+        "PCR_PARA3": "Parainfluenza 3",
+        "IFI_PARA4": "Parainfluenza 4",
+        "PCR_PARA4": "Parainfluenza 4",
+        "PCR_METAP": "Metapneumovírus",
+        "PCR_RINO":  "Rinovírus",
+        "PCR_BOCA":  "Bocavírus",
+    }
+    SG_ALL_VIRUS_COLORS = {
+        "Influenza":       "#EECA3B",
+        "VSR":             "#B279A2",
+        "SARS-CoV-2":      "#54A24B",
+        "Adenovírus":      "#72B7B2",
+        "Parainfluenza 1": "#4C78A8",
+        "Parainfluenza 2": "#F58518",
+        "Parainfluenza 3": "#E45756",
+        "Parainfluenza 4": "#9C9C9C",
+        "Metapneumovírus": "#FF9DA6",
+        "Rinovírus":       "#BAB0AC",
+        "Bocavírus":       "#636363",
+    }
+
+    _sg_vrows = []
+    for _col, _label in SG_VIRUS_MAP.items():
+        if _col not in _df_t2.columns:
+            continue
+        _tmp = _df_t2[["DT_PRISINT", _col]].copy()
+        _tmp[_col] = pd.to_numeric(_tmp[_col], errors="coerce")
+        _pos = _tmp[_tmp[_col] >= 1][["DT_PRISINT"]].copy()
+        _pos["virus"] = _label
+        _sg_vrows.append(_pos)
+
+    if not _sg_vrows:
+        st.info("Nenhuma coluna de teste encontrada.")
+    else:
+        _sg_vlong = pd.concat(_sg_vrows, ignore_index=True).dropna(subset=["DT_PRISINT"])
+        _yr_sgv, _wk_sgv = paho_year_week(_sg_vlong["DT_PRISINT"])
+        _sg_vlong["semana"]      = "SE " + _wk_sgv.astype(str).str.zfill(2) + "/" + _yr_sgv.astype(str)
+        _sg_vlong["semana_sort"] = _yr_sgv * 100 + _wk_sgv
+
+        _sg_all_virus = sorted(_sg_vlong["virus"].unique())
+        _sg_virus_sel = st.selectbox(
+            "Vírus", ["Todos os Vírus"] + _sg_all_virus,
+            key="sg_virus_sel",
+        )
+
+        _sg_vfilt = _sg_vlong if _sg_virus_sel == "Todos os Vírus" else _sg_vlong[_sg_vlong["virus"] == _sg_virus_sel]
+        _sg_agg_v = _sg_vfilt.groupby(["semana", "semana_sort", "virus"]).size().reset_index(name="n")
+        _sg_ord_v = _sg_agg_v[["semana", "semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
+        _sg_virus_order = _sg_all_virus if _sg_virus_sel == "Todos os Vírus" else [_sg_virus_sel]
+        _sg_fig_v = px.bar(
+            _sg_agg_v, x="semana", y="n", color="virus",
+            color_discrete_map=SG_ALL_VIRUS_COLORS,
+            title="Testes Positivos por Vírus e Semana Epidemiológica",
+            labels={"semana": "Semana Epidemiológica", "n": "Nº Testes Positivos", "virus": "Vírus"},
+            category_orders={"semana": _sg_ord_v, "virus": _sg_virus_order},
+        )
+        _add_pct_hover(_sg_fig_v, _sg_agg_v, unit="testes positivos")
+        _bar_layout(_sg_fig_v)
+        st.plotly_chart(_sg_fig_v, width='stretch')
+        st.caption(f"Fonte: {_FONTE_SG}")
 
 
 # ============================================================
