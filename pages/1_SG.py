@@ -131,6 +131,16 @@ _FONTE_PROG = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP-GRIPE"
 # Recife total population (IBGE Censo 2022) for incidence rate per 100k
 _RECIFE_POP = 1_640_147
 
+_SG_RACA_LABELS = {1: "Branca", 2: "Preta", 3: "Amarela", 4: "Parda", 5: "Indígena", 9: "Ignorado"}
+_SG_RACA_COLORS = {
+    "Branca":   "#4C78A8",
+    "Preta":    "#F58518",
+    "Amarela":  "#E45756",
+    "Parda":    "#72B7B2",
+    "Indígena": "#54A24B",
+    "Ignorado": "#B279A2",
+}
+
 
 
 if st.session_state.pop("sg_goto_nowcasting", False):
@@ -312,7 +322,7 @@ with tab1:
     st.markdown("#### Total de Casos")
 
     _faixa_view = st.radio(
-        "Visualização", ["Total", "Faixa Etária", "Sexo"],
+        "Visualização", ["Total", "Faixa Etária", "Sexo", "Raça/Cor"],
         horizontal=True, key="sg_faixa_view", label_visibility="collapsed",
     )
 
@@ -386,6 +396,29 @@ with tab1:
             _bar_layout(_fig_sx)
             add_ma_overlay(_fig_sx, _agg_sx)
             st.plotly_chart(_fig_sx, width='stretch')
+    elif _faixa_view == "Raça/Cor":
+        _rc = df_filt.dropna(subset=["DT_PRISINT"]).copy()
+        _rc["RACA_LABEL"] = pd.to_numeric(_rc["RACA"], errors="coerce").map(_SG_RACA_LABELS)
+        _rc = _rc.dropna(subset=["RACA_LABEL"])
+        if _rc.empty:
+            st.info("Sem dados de raça/cor.")
+        else:
+            _yr_rc, _wk_rc = paho_year_week(_rc["DT_PRISINT"])
+            _rc["semana"]      = "SE " + _wk_rc.astype(str).str.zfill(2) + "/" + _yr_rc.astype(str)
+            _rc["semana_sort"] = _yr_rc * 100 + _wk_rc
+            _agg_rc = _rc.groupby(["semana", "semana_sort", "RACA_LABEL"]).size().reset_index(name="n")
+            _ord_rc = _agg_rc[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
+            _fig_rc = px.bar(
+                _agg_rc, x="semana", y="n", color="RACA_LABEL",
+                color_discrete_map=_SG_RACA_COLORS,
+                title="Total de Casos por Raça/Cor por Semana Epidemiológica",
+                labels={"semana": "Semana Epidemiológica", "n": "Nº Casos", "RACA_LABEL": "Raça/Cor"},
+                category_orders={"semana": _ord_rc, "RACA_LABEL": list(_SG_RACA_LABELS.values())},
+            )
+            _add_pct_hover(_fig_rc, _agg_rc)
+            _bar_layout(_fig_rc)
+            add_ma_overlay(_fig_rc, _agg_rc)
+            st.plotly_chart(_fig_rc, width='stretch')
     st.caption(f"Fonte: {_FONTE_SG}")
 
     # ---- FIN_FLU — Influenza type (A segmented by FIN_SUBT subtypes) ------------
