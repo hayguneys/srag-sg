@@ -392,7 +392,6 @@ def _render_srag_obitos_extras(df_view):
             HeatMap(
                 _heat_points,
                 min_opacity=0.35,
-                max_val=_max_w,
                 radius=28,
                 blur=22,
                 gradient={0.2: "#4C78A8", 0.5: "#F58518", 0.8: "#E45756", 1.0: "#9B0000"},
