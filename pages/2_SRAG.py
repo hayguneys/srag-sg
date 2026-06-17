@@ -36,11 +36,12 @@ df_all = df_all[df_all["ID_MN_RESI"] == "RECIFE"].copy()
 _SRAG_UNIT_COL  = "ID_UNIDADE"
 _SRAG_CODE_COL  = "CO_UNI_NOT"
 _CLINICAS_SRAG = {
-    "Barros Lima":          "BARROS LIMA",
-    "Policlínica Agamenon": "AGAMENON",
-    "Arnaldo Marques":      "ARNALDO MARQUES",
-    "Bandeira Filho":       "BANDEIRA FILHO",
-    "Amaury Coutinho":      "AMAURY COUTINHO",
+    "US 153 POLICLINICA E MATERNIDADE ARNALDO MARQUES":      "ARNALDO MARQUES",
+    "US 159 POLICLINICA AGAMENON MAGALHAES":                 "US 159 POLICLINICA",
+    "US 163 HOSPITAL DE PEDIATRIA HELENA MOURA":             "HELENA MOURA",
+    "US 164 CENTRO DE REIDRATACAO E URG PED M CRAVO GAMA":  "CRAVO GAMA",
+    "US 167 POLICLINICA E MATERNIDADE PROFESSOR BARROS LIMA":"BARROS LIMA",
+    "US 169 POLICLINICA AMAURY COUTINHO":                    "AMAURY COUTINHO",
 }
 
 
@@ -64,7 +65,7 @@ _UNI_LABELS = {
 
 # name -> unit code, and the full sorted list of notification-unit names.
 _SRAG_UNIT_CODE = unit_code_map(df_all, _SRAG_UNIT_COL, _SRAG_CODE_COL)
-_SRAG_UNIT_NAMES = sorted(_SRAG_UNIT_CODE.keys())
+_SRAG_UNIT_NAMES = sorted(k for k in _SRAG_UNIT_CODE if k not in _CLINICAS_SRAG)
 _UNI_OPTIONS = (
     [_UNI_TODAS, _UNI_MUNI, _UNI_EXMUNI, _UNI_DIV]
     + list(_CLINICAS_SRAG.keys())

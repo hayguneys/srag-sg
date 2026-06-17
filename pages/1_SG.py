@@ -31,14 +31,14 @@ st.caption(
 df_all = load_sg()
 df_all = df_all[df_all["COD_MUNRES"] == 261160].copy()
 
-# Per-clinic selector: display name -> substring matched against NOME_UNIDA.
+# Per-clinic selector: full NOME_UNIDA -> substring matched against NOME_UNIDA.
 _CLINICAS_SG = {
-    "Barros Lima":          "BARROS LIMA",
-    "Policlínica Agamenon": "AGAMENON",
-    "Arnaldo Marques":      "ARNALDO MARQUES",
-    "Bandeira Filho":       "BANDEIRA FILHO",
-    "Amaury Coutinho":      "AMAURY COUTINHO",
-    "Cravo Gama":           "CRAVO GAMA",
+    "US 153 POLICLINICA E MATERNIDADE ARNALDO MARQUES":      "ARNALDO MARQUES",
+    "US 159 POLICLINICA AGAMENON MAGALHAES":                 "AGAMENON",
+    "US 163 HOSPITAL DE PEDIATRIA HELENA MOURA":             "HELENA MOURA",
+    "US 164 CENTRO DE REIDRATACAO E URG PED M CRAVO GAMA":  "CRAVO GAMA",
+    "US 167 POLICLINICA E MATERNIDADE PROFESSOR BARROS LIMA":"BARROS LIMA",
+    "US 169 POLICLINICA AMAURY COUTINHO":                    "AMAURY COUTINHO",
 }
 
 
@@ -62,7 +62,7 @@ _UNI_LABELS = {
 
 # name -> unit code, and the full sorted list of notification-unit names.
 _SG_UNIT_CODE = unit_code_map(df_all, "NOME_UNIDA", "COD_UNID")
-_SG_UNIT_NAMES = sorted(_SG_UNIT_CODE.keys())
+_SG_UNIT_NAMES = sorted(k for k in _SG_UNIT_CODE if k not in _CLINICAS_SG)
 _UNI_OPTIONS = (
     [_UNI_TODAS, _UNI_MUNI, _UNI_EXMUNI, _UNI_DIV]
     + list(_CLINICAS_SG.keys())
