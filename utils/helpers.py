@@ -84,58 +84,87 @@ def render_epiweek_slider(
 ) -> tuple[tuple[int, int], tuple[int, int]]:
     """Render year/week selectboxes + SE/Ano range slider; return (se_lo, se_hi).
 
-    The selectboxes (above) and the slider (below) are kept in sync via
-    session_state: selectbox changes pre-seed the slider key; slider changes
-    are read back into the selectboxes on the next render.
+    Bidirectional sync via on_change callbacks:
+    - Slider moved  → _slider_changed writes the four selectbox keys.
+    - Selectbox changed → _select_changed writes the slider key.
+    Both callbacks run before the next script re-execution, so each widget
+    always reflects the other's latest value.
     """
-    opts = epiweek_options(start, end)
+    opts   = epiweek_options(start, end)
     labels = [epiweek_label(y, w) for y, w in opts]
     all_years = sorted(set(y for y, w in opts))
 
-    # Read current position from session_state (set by slider or prior selectbox)
-    curr_lo_lbl = labels[0]
-    curr_hi_lbl = labels[-1]
-    if key in st.session_state:
-        val = st.session_state[key]
-        if isinstance(val, (list, tuple)) and len(val) == 2:
-            lo, hi = val
-            if lo in labels: curr_lo_lbl = lo
-            if hi in labels: curr_hi_lbl = hi
-    curr_lo_y, curr_lo_w = opts[labels.index(curr_lo_lbl)]
-    curr_hi_y, curr_hi_w = opts[labels.index(curr_hi_lbl)]
+    _sk   = key                    # slider key
+    _lo_y = f"{key}_sel_lo_y"
+    _lo_w = f"{key}_sel_lo_w"
+    _hi_y = f"{key}_sel_hi_y"
+    _hi_w = f"{key}_sel_hi_w"
+
+    def _slider_changed():
+        val = st.session_state.get(_sk)
+        if not (isinstance(val, (list, tuple)) and len(val) == 2):
+            return
+        lo_lbl, hi_lbl = val
+        if lo_lbl in labels and hi_lbl in labels:
+            lo_y, lo_w = opts[labels.index(lo_lbl)]
+            hi_y, hi_w = opts[labels.index(hi_lbl)]
+            st.session_state[_lo_y] = lo_y
+            st.session_state[_lo_w] = lo_w
+            st.session_state[_hi_y] = hi_y
+            st.session_state[_hi_w] = hi_w
+
+    def _select_changed():
+        lo_y   = st.session_state.get(_lo_y, all_years[0])
+        lo_wks = [w for y, w in opts if y == lo_y]
+        lo_w   = st.session_state.get(_lo_w)
+        if lo_w not in lo_wks:
+            lo_w = lo_wks[0] if lo_wks else 1
+        hi_y   = st.session_state.get(_hi_y, all_years[-1])
+        hi_wks = [w for y, w in opts if y == hi_y]
+        hi_w   = st.session_state.get(_hi_w)
+        if hi_w not in hi_wks:
+            hi_w = hi_wks[-1] if hi_wks else 52
+        new_lo = epiweek_label(lo_y, lo_w)
+        new_hi = epiweek_label(hi_y, hi_w)
+        if new_lo in labels and new_hi in labels:
+            if labels.index(new_lo) > labels.index(new_hi):
+                new_lo, new_hi = new_hi, new_lo
+            st.session_state[_sk] = (new_lo, new_hi)
+
+    # Initialise all five keys on first load
+    if _sk not in st.session_state:
+        st.session_state[_sk] = (labels[0], labels[-1])
+    sl_lo, sl_hi = st.session_state[_sk]
+    if sl_lo not in labels: sl_lo = labels[0]
+    if sl_hi not in labels: sl_hi = labels[-1]
+    lo_y0, lo_w0 = opts[labels.index(sl_lo)]
+    hi_y0, hi_w0 = opts[labels.index(sl_hi)]
+    if _lo_y not in st.session_state: st.session_state[_lo_y] = lo_y0
+    if _lo_w not in st.session_state: st.session_state[_lo_w] = lo_w0
+    if _hi_y not in st.session_state: st.session_state[_hi_y] = hi_y0
+    if _hi_w not in st.session_state: st.session_state[_hi_w] = hi_w0
 
     # --- Selectboxes --------------------------------------------------------
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        sel_lo_y = st.selectbox(
-            "Ano inicial", all_years,
-            index=all_years.index(curr_lo_y) if curr_lo_y in all_years else 0,
-            key=f"{key}_sel_lo_y",
-        )
-    lo_weeks = [w for y, w in opts if y == sel_lo_y]
+        st.selectbox("Ano inicial", all_years, key=_lo_y, on_change=_select_changed)
+    lo_weeks = [w for y, w in opts if y == st.session_state[_lo_y]]
+    if st.session_state.get(_lo_w) not in lo_weeks:
+        st.session_state[_lo_w] = lo_weeks[0] if lo_weeks else 1
     with c2:
-        lo_w_idx = lo_weeks.index(curr_lo_w) if (sel_lo_y == curr_lo_y and curr_lo_w in lo_weeks) else 0
-        sel_lo_w = st.selectbox("SE inicial", lo_weeks, index=lo_w_idx, key=f"{key}_sel_lo_w")
+        st.selectbox("SE inicial", lo_weeks, key=_lo_w, on_change=_select_changed)
     with c3:
-        sel_hi_y = st.selectbox(
-            "Ano final", all_years,
-            index=all_years.index(curr_hi_y) if curr_hi_y in all_years else len(all_years) - 1,
-            key=f"{key}_sel_hi_y",
-        )
-    hi_weeks = [w for y, w in opts if y == sel_hi_y]
+        st.selectbox("Ano final", all_years, key=_hi_y, on_change=_select_changed)
+    hi_weeks = [w for y, w in opts if y == st.session_state[_hi_y]]
+    if st.session_state.get(_hi_w) not in hi_weeks:
+        st.session_state[_hi_w] = hi_weeks[-1] if hi_weeks else 52
     with c4:
-        hi_w_idx = hi_weeks.index(curr_hi_w) if (sel_hi_y == curr_hi_y and curr_hi_w in hi_weeks) else len(hi_weeks) - 1
-        sel_hi_w = st.selectbox("SE final", hi_weeks, index=hi_w_idx, key=f"{key}_sel_hi_w")
-
-    # Sync selectbox selection → slider state (clamp lo ≤ hi)
-    new_lo = epiweek_label(sel_lo_y, sel_lo_w)
-    new_hi = epiweek_label(sel_hi_y, sel_hi_w)
-    if labels.index(new_lo) > labels.index(new_hi):
-        new_lo, new_hi = new_hi, new_lo
-    st.session_state[key] = (new_lo, new_hi)
+        st.selectbox("SE final", hi_weeks, key=_hi_w, on_change=_select_changed)
 
     # --- Slider -------------------------------------------------------------
-    lbl_lo, lbl_hi = st.select_slider(label, options=labels, key=key)
+    lbl_lo, lbl_hi = st.select_slider(
+        label, options=labels, key=_sk, on_change=_slider_changed,
+    )
     return opts[labels.index(lbl_lo)], opts[labels.index(lbl_hi)]
 
 
