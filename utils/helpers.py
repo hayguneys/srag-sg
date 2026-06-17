@@ -876,7 +876,7 @@ def load_esus_kpi() -> pd.DataFrame:
     if not path.exists():
         st.error(f"Arquivo não encontrado: {path}")
         st.stop()
-    want = ["datanotificacao", "resultadofinal", "municipionotificacao", "estadonotificacao"]
+    want = ["datanotificacao", "resultadofinal", "municipionotificacao", "estadonotificacao", "municipio"]
     try:
         df = pd.read_parquet(path, columns=want)
     except Exception:

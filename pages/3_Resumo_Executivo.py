@@ -35,7 +35,7 @@ _srag_all = load_srag_withna()
 _srag_all = _srag_all[_srag_all["ID_MN_RESI"] == "RECIFE"].copy()
 
 _esus_all = load_esus_kpi()
-_esus_rec = _esus_all[_esus_all["municipionotificacao"] == "Recife"].copy() if "municipionotificacao" in _esus_all.columns else _esus_all.copy()
+_esus_rec = _esus_all[_esus_all["municipio"] == "Recife"].copy() if "municipio" in _esus_all.columns else _esus_all.copy()
 
 # ============================================================
 # Unit filter (SRAG units)
