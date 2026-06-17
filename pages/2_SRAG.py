@@ -602,9 +602,27 @@ with tab1:
     }
 
     _faixa_view = st.radio(
-        "Visualização", ["Faixa Etária", "Sexo", "Raça/Cor"],
+        "Visualização", ["Total", "Faixa Etária", "Sexo", "Raça/Cor"],
         horizontal=True, key="srag_faixa_view",
     )
+
+    if _faixa_view == "Total":
+        _tot = df_view.dropna(subset=["DT_SIN_PRI"]).copy()
+        _yr_t, _wk_t = paho_year_week(_tot["DT_SIN_PRI"])
+        _tot["semana"]      = "SE " + _wk_t.astype(str).str.zfill(2) + "/" + _yr_t.astype(str)
+        _tot["semana_sort"] = _yr_t * 100 + _wk_t
+        _agg_t = _tot.groupby(["semana", "semana_sort"]).size().reset_index(name="n")
+        _ord_t = _agg_t.sort_values("semana_sort")["semana"].tolist()
+        _fig_t = px.bar(
+            _agg_t, x="semana", y="n",
+            title=f"Total de {_unidade} por Semana Epidemiológica",
+            labels={"semana": "Semana Epidemiológica", "n": f"Nº {_unidade}"},
+            category_orders={"semana": _ord_t},
+        )
+        _fig_t.update_traces(marker_color="#4C78A8", hovertemplate="%{x}<br>" + _unidade + ": %{y}<extra></extra>")
+        _bar_layout(_fig_t)
+        add_ma_overlay(_fig_t, _agg_t)
+        st.plotly_chart(_fig_t, width='stretch')
 
     _age = df_view.copy()
     _age["NU_IDADE_N"] = pd.to_numeric(_age["NU_IDADE_N"], errors="coerce")

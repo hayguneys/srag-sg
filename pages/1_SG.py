@@ -320,9 +320,27 @@ with tab1:
     st.markdown("#### Total de Casos")
 
     _faixa_view = st.radio(
-        "Visualização", ["Faixa Etária", "Sexo", "Raça/Cor"],
+        "Visualização", ["Total", "Faixa Etária", "Sexo", "Raça/Cor"],
         horizontal=True, key="sg_faixa_view",
     )
+
+    if _faixa_view == "Total":
+        _tot = df_filt.dropna(subset=["DT_PRISINT"]).copy()
+        _yr_t, _wk_t = paho_year_week(_tot["DT_PRISINT"])
+        _tot["semana"]      = "SE " + _wk_t.astype(str).str.zfill(2) + "/" + _yr_t.astype(str)
+        _tot["semana_sort"] = _yr_t * 100 + _wk_t
+        _agg_t = _tot.groupby(["semana", "semana_sort"]).size().reset_index(name="n")
+        _ord_t = _agg_t.sort_values("semana_sort")["semana"].tolist()
+        _fig_t = px.bar(
+            _agg_t, x="semana", y="n",
+            title="Total de Casos por Semana Epidemiológica",
+            labels={"semana": "Semana Epidemiológica", "n": "Nº Casos"},
+            category_orders={"semana": _ord_t},
+        )
+        _fig_t.update_traces(marker_color="#4C78A8", hovertemplate="%{x}<br>Casos: %{y}<extra></extra>")
+        _bar_layout(_fig_t)
+        add_ma_overlay(_fig_t, _agg_t)
+        st.plotly_chart(_fig_t, width='stretch')
 
     _age = df_filt.copy()
     _age["IDADE"] = pd.to_numeric(_age["IDADE"], errors="coerce")
