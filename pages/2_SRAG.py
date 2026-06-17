@@ -735,7 +735,7 @@ with tab1:
         st.info("Sem dados de distrito para os filtros selecionados.")
     else:
         _srag_dist_plot = _srag_dist[["distrito", "n", "taxa"]].copy()
-        _cmp.html(_folium_choropleth_distritos(_srag_dist_plot, color_col=_srag_map_col), height=520, scrolling=False)
+        _cmp.html(_folium_choropleth_distritos(_srag_dist_plot, color_col=_srag_map_col), height=920, scrolling=False)
         st.caption(f"Fonte: {_FONTE_SRAG}" + ("" if _show_obitos else " · Pop. IBGE Censo 2022."))
 
     # ---- Óbitos-only extras: hospital/classificação, timeline, heatmap, tabela

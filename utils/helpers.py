@@ -745,6 +745,11 @@ def _folium_choropleth_distritos(data: pd.DataFrame, color_col: str = "n") -> st
         zoom_start=11,
         tiles="CartoDB positron",
         control_scale=True,
+        min_zoom=10,
+        max_zoom=14,
+        max_bounds=True,
+        min_lat=-8.25, max_lat=-7.85,
+        min_lon=-35.15, max_lon=-34.70,
     )
 
     Choropleth(
@@ -769,6 +774,35 @@ def _folium_choropleth_distritos(data: pd.DataFrame, color_col: str = "n") -> st
         tooltip=folium.GeoJsonTooltip(fields=tooltip_fields, aliases=tooltip_aliases, localize=True),
         popup=folium.GeoJsonPopup(fields=tooltip_fields, aliases=tooltip_aliases),
     ).add_to(m)
+
+    # White district name labels at polygon centroids
+    for feat in geojson["features"]:
+        _code = feat["properties"].get("cdistscodi", 0)
+        _dname = _DISTRITO_NAMES.get(_code)
+        if not _dname:
+            continue
+        _geom = feat["geometry"]
+        if _geom["type"] == "Polygon":
+            _ring = _geom["coordinates"][0]
+        elif _geom["type"] == "MultiPolygon":
+            _ring = max(_geom["coordinates"], key=lambda p: len(p[0]))[0]
+        else:
+            continue
+        _clat = sum(c[1] for c in _ring) / len(_ring)
+        _clon = sum(c[0] for c in _ring) / len(_ring)
+        folium.Marker(
+            location=[_clat, _clon],
+            icon=folium.DivIcon(
+                html=(
+                    f'<div style="font-size:12px;font-weight:bold;color:white;'
+                    f'text-shadow:-1px -1px 0 rgba(0,0,0,.55),1px -1px 0 rgba(0,0,0,.55),'
+                    f'-1px 1px 0 rgba(0,0,0,.55),1px 1px 0 rgba(0,0,0,.55);'
+                    f'white-space:nowrap;text-align:center;">{_dname}</div>'
+                ),
+                icon_size=(55, 20),
+                icon_anchor=(27, 10),
+            ),
+        ).add_to(m)
 
     return m._repr_html_()
 
