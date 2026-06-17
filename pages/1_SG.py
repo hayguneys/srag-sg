@@ -412,23 +412,21 @@ with tab1:
         1: "Influenza A (H1N1)pdm09",
         4: "Influenza A não subtipado",
         6: "Influenza A (H3N2)",
-        7: "Influenza A não subtipável",
+        7: "Influenza A não subtipado",  # merged with code 4
         8: "Inconclusivo",
     }
     FLU_COMBINED_COLORS = {
-        "Influenza A (H1N1)pdm09":    "#E45756",
-        "Influenza A (H3N2)":         "#F58518",
-        "Influenza A não subtipado":  "#9C9C9C",
-        "Influenza A não subtipável": "#72B7B2",
-        "Inconclusivo":               "#B279A2",
-        "Influenza A":                "#D62728",
-        "Influenza B":                "#4C78A8",
+        "Influenza A (H1N1)pdm09":   "#E45756",
+        "Influenza A (H3N2)":        "#F58518",
+        "Influenza A não subtipado": "#9C9C9C",
+        "Inconclusivo":              "#B279A2",
+        "Influenza A":               "#D62728",
+        "Influenza B":               "#4C78A8",
     }
     FLU_COMBINED_ORDER = [
         "Influenza A (H1N1)pdm09",
         "Influenza A (H3N2)",
         "Influenza A não subtipado",
-        "Influenza A não subtipável",
         "Inconclusivo",
         "Influenza A",
         "Influenza B",
