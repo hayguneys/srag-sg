@@ -13,6 +13,7 @@ from utils.helpers import (
     embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
     render_epiweek_slider, filter_epiweek, add_ma_overlay,
     render_seasonality_hist, unit_code_map, SRAG_EPIWEEK_MIN,
+    period_compare_label, format_kpi_delta,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, DATA_DIR, inject_test_frames,
 )
 
@@ -474,11 +475,7 @@ with tab1:
 
     _show_obitos = _evo_filter == "Óbitos"
 
-    def _calc_delta(current, previous):
-        if previous == 0:
-            return None
-        delta = ((current - previous) / previous * 100)
-        return f"{delta:+.0f}"
+    _cmp = period_compare_label(_se_lo, _se_hi)
 
     def _bar_layout(fig):
         fig.update_layout(
@@ -522,18 +519,17 @@ with tab1:
         _n_fem_prev = (_kpi_prev["CS_SEXO"] == "F").sum()
         _n_masc_prev = (_kpi_prev["CS_SEXO"] == "M").sum()
 
-        delta_total = _calc_delta(len(_kpi_base), len(_kpi_prev))
-        delta_fem = _calc_delta(_n_fem, _n_fem_prev)
-        delta_masc = _calc_delta(_n_masc, _n_masc_prev)
+        delta_total = format_kpi_delta(len(_kpi_base), len(_kpi_prev), _cmp)
+        delta_fem   = format_kpi_delta(_n_fem, _n_fem_prev, _cmp)
+        delta_masc  = format_kpi_delta(_n_masc, _n_masc_prev, _cmp)
 
-        kpis = [
-            ("Total de óbitos", fmt_int(len(_kpi_base)), delta_total) if delta_total else ("Total de óbitos", fmt_int(len(_kpi_base))),
-            ("Feminino", fmt_int(_n_fem), delta_fem) if delta_fem else ("Feminino", fmt_int(_n_fem)),
-            ("Masculino", fmt_int(_n_masc), delta_masc) if delta_masc else ("Masculino", fmt_int(_n_masc)),
+        render_kpis([
+            ("Total de óbitos", fmt_int(len(_kpi_base)), delta_total),
+            ("Feminino", fmt_int(_n_fem), delta_fem),
+            ("Masculino", fmt_int(_n_masc), delta_masc),
             ("Idade média", f"{_avg_age:.1f} anos"),
             ("Internados em UTI", f"{_uti_pct:.1f}%"),
-        ]
-        render_kpis(kpis)
+        ])
     else:
         total_cases  = len(df_filt)
         total_deaths = int((df_filt["EVOLUCAO"] == 2).sum()) if "EVOLUCAO" in df_filt.columns else 0
@@ -542,14 +538,13 @@ with tab1:
         total_cases_prev = len(df_prev)
         total_deaths_prev = int((df_prev["EVOLUCAO"] == 2).sum()) if "EVOLUCAO" in df_prev.columns else 0
 
-        delta_cases = _calc_delta(total_cases, total_cases_prev)
-        delta_deaths = _calc_delta(total_deaths, total_deaths_prev)
+        delta_cases  = format_kpi_delta(total_cases, total_cases_prev, _cmp)
+        delta_deaths = format_kpi_delta(total_deaths, total_deaths_prev, _cmp)
 
-        kpis = [
-            ("Total de casos", fmt_int(total_cases), delta_cases) if delta_cases else ("Total de casos", fmt_int(total_cases)),
-            ("Total de óbitos", fmt_int(total_deaths), delta_deaths) if delta_deaths else ("Total de óbitos", fmt_int(total_deaths)),
-        ]
-        render_kpis(kpis)
+        render_kpis([
+            ("Total de casos", fmt_int(total_cases), delta_cases),
+            ("Total de óbitos", fmt_int(total_deaths), delta_deaths),
+        ])
 
     st.markdown("---")
 

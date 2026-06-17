@@ -257,19 +257,44 @@ def add_ma_overlay(
 
 
 # --- KPI rendering -------------------------------------------------------
+def period_compare_label(se_lo: tuple[int, int], se_hi: tuple[int, int]) -> str:
+    """Label comparing the selected SE range to the same range one year earlier.
+
+    e.g. a single-year range gives "2026 vs 2025"; a multi-year range gives
+    "2022–2026 vs 2021–2025".
+    """
+    y_lo, y_hi = se_lo[0], se_hi[0]
+    cur  = f"{y_lo}" if y_lo == y_hi else f"{y_lo}–{y_hi}"
+    prev = f"{y_lo - 1}" if y_lo == y_hi else f"{y_lo - 1}–{y_hi - 1}"
+    return f"{cur} vs {prev}"
+
+
+def format_kpi_delta(cur: float, prev: float, compare_label: str) -> str | None:
+    """Signed percent change vs. the previous period, annotated with the years.
+
+    Returns a string for ``st.metric``'s ``delta`` (which renders a coloured
+    up/down arrow from the sign), or None when there is no baseline to compare.
+    """
+    if not prev:
+        return None
+    pct = (cur - prev) / prev * 100
+    return f"{pct:+.0f}% ({compare_label})"
+
+
 def render_kpis(kpis: list[tuple[str, str] | tuple[str, str, str]]) -> None:
     """Render a row of KPI cards. Each kpi is (label, value) or (label, value, delta).
 
-    Delta is formatted as "| <delta>%" when provided.
+    When a delta string is provided it is passed to ``st.metric``'s native
+    ``delta`` slot, which draws a coloured ↑/↓ arrow based on its sign.
     """
     cols = st.columns(len(kpis))
     for col, kpi in zip(cols, kpis):
         with col:
-            if len(kpi) == 3:
+            if len(kpi) == 3 and kpi[2]:
                 label, value, delta = kpi
-                st.metric(label, f"{value} | {delta}%")
+                st.metric(label, value, delta=delta)
             else:
-                label, value = kpi
+                label, value = kpi[0], kpi[1]
                 st.metric(label, value)
 
 

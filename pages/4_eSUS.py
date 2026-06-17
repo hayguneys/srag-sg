@@ -20,6 +20,7 @@ import streamlit as st
 
 from utils.helpers import (
     load_esus_page, render_kpis, fmt_int, paho_year_week,
+    period_compare_label, format_kpi_delta,
     render_epiweek_slider, filter_epiweek, add_ma_overlay,
     render_ma_chart, render_seasonality_hist, embed_html_plot,
     render_forecast_table, PLOTS_DIR, ESUS_EPIWEEK_MIN,
@@ -124,12 +125,6 @@ def _bar_layout(fig):
     )
 
 
-def _calc_delta(current, previous):
-    if previous == 0:
-        return None
-    return f"{((current - previous) / previous * 100):+.0f}"
-
-
 tab1, tab2, tab3 = st.tabs(["📊 Descritivo", "🧪 Testes", "📈 Nowcasting + Forecasting"])
 
 # ============================================================
@@ -158,15 +153,15 @@ with tab1:
         total_pos = total_pos_prev = _tested = 0
         pct_pos = 0.0
 
-    delta_notif = _calc_delta(total_notif, len(df_prev))
-    delta_pos = _calc_delta(total_pos, total_pos_prev)
+    _cmp = period_compare_label(_se_lo, _se_hi)
+    delta_notif = format_kpi_delta(total_notif, len(df_prev), _cmp)
+    delta_pos   = format_kpi_delta(total_pos, total_pos_prev, _cmp)
 
-    kpis = [
-        ("Notificações", fmt_int(total_notif), delta_notif) if delta_notif else ("Notificações", fmt_int(total_notif)),
-        ("Testes positivos", fmt_int(total_pos), delta_pos) if delta_pos else ("Testes positivos", fmt_int(total_pos)),
+    render_kpis([
+        ("Notificações", fmt_int(total_notif), delta_notif),
+        ("Testes positivos", fmt_int(total_pos), delta_pos),
         ("Positividade", f"{pct_pos:.1f}%"),
-    ]
-    render_kpis(kpis)
+    ])
     st.caption(f"Data analítica: {_sintoma_src}.")
 
     st.markdown("---")

@@ -13,6 +13,7 @@ from utils.helpers import (
     embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
     render_epiweek_slider, filter_epiweek, add_ma_overlay,
     render_seasonality_hist, unit_code_map, SG_EPIWEEK_MIN,
+    period_compare_label, format_kpi_delta,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, inject_test_frames,
 )
 
@@ -172,12 +173,6 @@ with tab1:
     df_filt = _filtra_clinicas_sg(df_filt, _unit_filter)
 
     # ---- KPIs with delta (same SE range, previous year) ----------------------
-    def _calc_delta(current, previous):
-        if previous == 0:
-            return None
-        delta = ((current - previous) / previous * 100)
-        return f"{delta:+.0f}"
-
     total_cases = len(df_filt)
     vac_flu  = int((df_filt["VACINA"] == 1).sum())      if "VACINA"     in df_filt.columns else 0
 
@@ -190,14 +185,14 @@ with tab1:
     total_cases_prev = len(df_prev)
     vac_flu_prev = int((df_prev["VACINA"] == 1).sum()) if "VACINA" in df_prev.columns else 0
 
-    delta_total = _calc_delta(total_cases, total_cases_prev)
-    delta_vac = _calc_delta(vac_flu, vac_flu_prev)
+    _cmp = period_compare_label(_se_lo, _se_hi)
+    delta_total = format_kpi_delta(total_cases, total_cases_prev, _cmp)
+    delta_vac   = format_kpi_delta(vac_flu, vac_flu_prev, _cmp)
 
-    kpis = [
-        ("Total de casos", fmt_int(total_cases), delta_total) if delta_total else ("Total de casos", fmt_int(total_cases)),
-        ("Vacinação Influenza", fmt_int(vac_flu), delta_vac) if delta_vac else ("Vacinação Influenza", fmt_int(vac_flu)),
-    ]
-    render_kpis(kpis)
+    render_kpis([
+        ("Total de casos", fmt_int(total_cases), delta_total),
+        ("Vacinação Influenza", fmt_int(vac_flu), delta_vac),
+    ])
 
     st.markdown("---")
 
