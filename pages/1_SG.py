@@ -313,7 +313,7 @@ with tab1:
 
     _faixa_view = st.radio(
         "Visualização", ["Total", "Faixa Etária", "Sexo"],
-        horizontal=True, key="sg_faixa_view",
+        horizontal=True, key="sg_faixa_view", label_visibility="collapsed",
     )
 
     if _faixa_view == "Total":
