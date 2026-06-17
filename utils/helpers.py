@@ -301,20 +301,45 @@ def render_kpis(kpis: list[tuple]) -> None:
     """Render a row of KPI cards.
 
     Each kpi is ``(label, value)``, ``(label, value, delta)``, or
-    ``(label, value, delta, help)``. A delta string is passed to
-    ``st.metric``'s native ``delta`` slot (coloured ↑/↓ arrow by sign); the
-    optional help text renders the hover tooltip balloon (e.g. the exact SE
-    range being compared).
+    ``(label, value, delta, help)``. The delta badge is shown to the right of
+    the value and coloured green/red by sign. The optional help text becomes a
+    tooltip on the badge.
     """
     cols = st.columns(len(kpis))
     for col, kpi in zip(cols, kpis):
-        with col:
-            delta = kpi[2] if len(kpi) >= 3 else None
-            help_txt = kpi[3] if len(kpi) >= 4 else None
-            if delta:
-                st.metric(kpi[0], kpi[1], delta=delta, help=help_txt)
+        label    = kpi[0]
+        value    = kpi[1]
+        delta    = kpi[2] if len(kpi) >= 3 else None
+        help_txt = kpi[3] if len(kpi) >= 4 else None
+
+        badge_html = ""
+        if delta:
+            if delta.startswith("+"):
+                bg, fg, arrow = "#d4edda", "#155724", "↑"
+            elif delta.startswith("-"):
+                bg, fg, arrow = "#f8d7da", "#721c24", "↓"
             else:
-                st.metric(kpi[0], kpi[1])
+                bg, fg, arrow = "#e2e3e5", "#383d41", ""
+            title_attr = f'title="{help_txt}"' if help_txt else ""
+            badge_html = (
+                f'<div {title_attr} style="background:{bg};color:{fg};'
+                f'border-radius:6px;padding:10px 14px;font-size:15px;'
+                f'font-weight:600;line-height:1.3;cursor:default;'
+                f'max-width:55%;text-align:right;">'
+                f'{arrow} {delta}</div>'
+            )
+
+        card = (
+            f'<div style="border:1px solid rgba(49,51,63,.2);border-radius:.5rem;'
+            f'padding:14px 16px;background:#ffffff;margin-bottom:8px;">'
+            f'<div style="font-size:13px;color:#555;margin-bottom:6px;">{label}</div>'
+            f'<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+            f'<div style="font-size:2rem;font-weight:700;color:#111;white-space:nowrap;">{value}</div>'
+            f'{badge_html}'
+            f'</div></div>'
+        )
+        with col:
+            st.markdown(card, unsafe_allow_html=True)
 
 
 def fmt_int(n) -> str:
