@@ -803,10 +803,6 @@ with tab2:
 
     # ---- Total de Testes -----------------------------------
     st.markdown("### Total de Testes")
-    st.caption(
-        "Total de testes realizados"
-        "e taxa de positividade por semana epidemiológica."
-    )
 
     _ttested_rows = []
     _tpos_rows    = []
@@ -877,7 +873,7 @@ with tab2:
             ),
         ))
         _fig_tot.update_layout(
-            title="Total de Testes Realizados e Taxa de Positividade",
+            title="Total de Testes Realizados e Taxa de Positividade por Semana Epidemiológica",
             xaxis=dict(
                 title="Semana Epidemiológica",
                 tickangle=-90,
