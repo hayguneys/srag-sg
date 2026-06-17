@@ -464,6 +464,8 @@ with tab1:
             )
             _add_pct_hover(_fig_f, _agg_f)
             _bar_layout(_fig_f)
+            _tot_f = _agg_f.groupby(["semana", "semana_sort"])["n"].sum().reset_index()
+            add_ma_overlay(_fig_f, _tot_f)
             st.plotly_chart(_fig_f, width='stretch')
             st.caption(f"Fonte: {_FONTE_SG}")
 
