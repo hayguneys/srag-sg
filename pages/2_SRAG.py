@@ -12,6 +12,7 @@ from utils.helpers import (
     load_srag_withna, render_kpis, fmt_int,
     embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
     render_epiweek_slider, filter_epiweek, add_ma_overlay,
+    render_seasonality_hist, unit_code_map, SRAG_EPIWEEK_MIN,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, DATA_DIR, inject_test_frames,
 )
 
@@ -29,7 +30,10 @@ st.caption(
 df_all = load_srag_withna()
 df_all = df_all[df_all["ID_MN_RESI"] == "RECIFE"].copy()
 
-# Per-clinic selector: display name -> substring matched against NM_UN_INTE.
+# Notification-unit column for SRAG: ID_UNIDADE (unidade de notificação),
+# with CO_UNI_NOT as the unit code. Preset shortcuts substring-match the name.
+_SRAG_UNIT_COL  = "ID_UNIDADE"
+_SRAG_CODE_COL  = "CO_UNI_NOT"
 _CLINICAS_SRAG = {
     "Barros Lima":          "BARROS LIMA",
     "Policlínica Agamenon": "AGAMENON",
@@ -39,48 +43,65 @@ _CLINICAS_SRAG = {
 }
 
 
-# Unidade de internação dropdown: preset shortcuts + a "Unidades municipais"
-# section header, followed by the individual municipal clinics. Streamlit's
-# multiselect has no native option groups, so the header is a decorative (no-op)
-# option and the presets are resolved in _filtra_clinicas_srag.
+# Unidade de Notificação dropdown: preset shortcuts + a "Unidades municipais"
+# section, then a second section listing EVERY notification unit (ID_UNIDADE)
+# by full name with its unit code (CO_UNI_NOT). Streamlit's multiselect has no
+# native option groups, so the section headers are decorative (no-op) options
+# and the selection is resolved in _filtra_clinicas_srag.
 _UNI_TODAS  = "__todas__"
 _UNI_MUNI   = "__municipais__"
 _UNI_EXMUNI = "__exceto_municipais__"
 _UNI_DIV    = "__sec_municipais__"
+_UNI_DIV2   = "__sec_todas__"
 _UNI_LABELS = {
     _UNI_TODAS:  "Todas as unidades",
     _UNI_MUNI:   "Todas as municipais",
     _UNI_EXMUNI: "Todas exceto municipais",
     _UNI_DIV:    "──────  Unidades municipais  ──────",
+    _UNI_DIV2:   "──────  Todas as unidades de notificação  ──────",
 }
-_UNI_OPTIONS = [_UNI_TODAS, _UNI_MUNI, _UNI_EXMUNI, _UNI_DIV] + list(_CLINICAS_SRAG.keys())
+
+# name -> unit code, and the full sorted list of notification-unit names.
+_SRAG_UNIT_CODE = unit_code_map(df_all, _SRAG_UNIT_COL, _SRAG_CODE_COL)
+_SRAG_UNIT_NAMES = sorted(_SRAG_UNIT_CODE.keys())
+_UNI_OPTIONS = (
+    [_UNI_TODAS, _UNI_MUNI, _UNI_EXMUNI, _UNI_DIV]
+    + list(_CLINICAS_SRAG.keys())
+    + [_UNI_DIV2]
+    + _SRAG_UNIT_NAMES
+)
 
 
 def _uni_label(opt):
-    return _UNI_LABELS.get(opt, opt)
+    if opt in _UNI_LABELS:
+        return _UNI_LABELS[opt]
+    if opt in _CLINICAS_SRAG:
+        return opt
+    code = _SRAG_UNIT_CODE.get(opt, "")
+    return f"{opt} · cód. {code}" if code else opt
 
 
 def _unidade_multiselect_srag(key):
-    """Render the Unidade de internação selector with presets + municipal section."""
+    """Render the Unidade de Notificação selector (presets + full unit list)."""
     return st.multiselect(
-        "Unidade de internação", _UNI_OPTIONS,
+        "Unidade de Notificação", _UNI_OPTIONS,
         default=[], key=key, format_func=_uni_label,
         placeholder="Todas as unidades",
     )
 
 
 def _filtra_clinicas_srag(df, selecionadas):
-    """Resolve the unidade selection (presets + clinics) into a row filter.
+    """Resolve the unidade selection (presets + clinics + named units) into a filter.
 
-    Empty, "Todas as unidades", or only the section header => no filtering.
+    Empty, "Todas as unidades", or only section headers => no filtering.
     """
-    if "NM_UN_INTE" not in df.columns:
+    if _SRAG_UNIT_COL not in df.columns:
         return df
-    sel = [s for s in (selecionadas or []) if s != _UNI_DIV]
+    sel = [s for s in (selecionadas or []) if s not in (_UNI_DIV, _UNI_DIV2)]
     if not sel or _UNI_TODAS in sel:
         return df
 
-    _nm = df["NM_UN_INTE"].str.upper().str.strip().fillna("")
+    _nm = df[_SRAG_UNIT_COL].str.upper().str.strip().fillna("")
     _muni_kw = list(_CLINICAS_SRAG.values())
     is_muni = _nm.apply(lambda x: any(k in x for k in _muni_kw))
 
@@ -95,6 +116,11 @@ def _filtra_clinicas_srag(df, selecionadas):
     _indiv_kw = [_CLINICAS_SRAG[c] for c in sel if c in _CLINICAS_SRAG]
     if _indiv_kw:
         mask = mask | _nm.apply(lambda x: any(k in x for k in _indiv_kw))
+        matched = True
+    # Exact full-name selections from the "Todas as unidades de notificação" list.
+    _exact = {s.upper().strip() for s in sel if s in _SRAG_UNIT_CODE}
+    if _exact:
+        mask = mask | _nm.isin(_exact)
         matched = True
 
     if not matched:
@@ -183,6 +209,7 @@ def _render_srag_summary_grid(df_view, unidade):
     with _r1b:
         _faixa_order = [l for l, _ in _SRAG_FAIXA_BINS]
         _age_ob = _ob.dropna(subset=["NU_IDADE_N"]).copy()
+        _age_ob["faixa"] = pd.NA  # ensure column exists (empty-frame safe)
         for _lbl, _msk in _SRAG_FAIXA_BINS:
             _age_ob.loc[_msk(_age_ob["NU_IDADE_N"]), "faixa"] = _lbl
         _age_ob = _age_ob.dropna(subset=["faixa"])
@@ -427,7 +454,7 @@ with tab1:
     # ---- SE/Ano range slider, unit filter and Casos/Óbitos filter -----------
     _c_year, _c_unit, _c_evo = st.columns([2, 2, 2])
     with _c_year:
-        _se_lo, _se_hi = render_epiweek_slider("srag_desc_se")
+        _se_lo, _se_hi = render_epiweek_slider("srag_desc_se", start=SRAG_EPIWEEK_MIN)
     with _c_unit:
         _unit_filter = _unidade_multiselect_srag("srag_desc_unit")
     with _c_evo:
@@ -584,6 +611,7 @@ with tab1:
     _age = df_view.copy()
     _age["NU_IDADE_N"] = pd.to_numeric(_age["NU_IDADE_N"], errors="coerce")
     _age = _age.dropna(subset=["DT_SIN_PRI", "NU_IDADE_N"])
+    _age["faixa"] = pd.NA  # ensure column exists (empty-frame safe)
     for _label, _mask in FAIXA_BINS:
         _age.loc[_mask(_age["NU_IDADE_N"]), "faixa"] = _label
     _age = _age.dropna(subset=["faixa"])
@@ -725,7 +753,7 @@ with tab2:
     # ---- SE/Ano range slider and unit filter --------------------------------
     _t2_cy, _t2_cu = st.columns([2, 2])
     with _t2_cy:
-        _t2_se_lo, _t2_se_hi = render_epiweek_slider("srag_test_se")
+        _t2_se_lo, _t2_se_hi = render_epiweek_slider("srag_test_se", start=SRAG_EPIWEEK_MIN)
     with _t2_cu:
         _t2_unit = _unidade_multiselect_srag("srag_test_unit")
 
@@ -969,6 +997,17 @@ with tab3:
     st.markdown("### Média Móvel — Semanas Epidemiológicas 2026")
     st.caption("Média móvel de 4 semanas sobre casos semanais por semana de início dos sintomas (`DT_SIN_PRI`).")
     render_ma_chart(df_all, onset_col="DT_SIN_PRI", titulo="Média Móvel 4 sem. — SRAG")
+    st.caption(f"Fonte: {_FONTE_SRAG}")
+
+    st.markdown("---")
+    st.markdown("### Sazonalidade — Média Histórica por Semana Epidemiológica")
+    st.caption(
+        "Média de casos por semana epidemiológica usando todos os anos disponíveis "
+        "(2019–2026) por semana de início dos sintomas (`DT_SIN_PRI`). A faixa cinza "
+        "mostra ±1 desvio-padrão entre anos; a linha destaca o ano mais recente."
+    )
+    render_seasonality_hist(df_all, onset_col="DT_SIN_PRI",
+                            titulo="Sazonalidade — SRAG (média por SE, todos os anos)")
     st.caption(f"Fonte: {_FONTE_SRAG}")
 
     st.markdown("---")

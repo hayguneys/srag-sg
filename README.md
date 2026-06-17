@@ -8,21 +8,34 @@ nowcasting e forecasting usando o modelo `nowcaster` INLA .
 
 ```
 .
-├── app.py                  # landing page
+├── app.py                  # landing page + navigation
 ├── pages/
-│   ├── 1_SG.py             # SG page (2 tabs)
-│   └── 2_SRAG.py           # SRAG page (2 tabs)
+│   ├── 1_SG.py             # SG page
+│   ├── 2_SRAG.py           # SRAG page
+│   ├── 4_eSUS.py           # e-SUS Notifica (COVID-19) page
+│   └── 3_Resumo_Executivo.py
 ├── utils/
-│   └── helpers.py          # data loading, filters, KPI helpers
+│   └── helpers.py          # data loading, filters, KPI/seasonality helpers
 ├── data/
-│   ├── sg_main.parquet     # SG cases (already trimmed to needed cols)
-│   └── srag_main.parquet   # SRAG cases (already trimmed to needed cols)
+│   ├── sg_main.parquet         # SG cases — série histórica desde 2013
+│   ├── srag_sintomas.parquet   # SRAG cases — série histórica desde 2019
+│   └── eSUS_all.parquet        # eSUS-Notifica (COVID-19)
 ├── plots/
 │   ├── nowcasting_sg.html  # pre-rendered interactive plotly
 │   └── nowcasting_srag.html
 ├── requirements.txt
 └── .streamlit/config.toml
 ```
+
+## Filtros e séries históricas
+
+- **Período (SE/Ano):** o seletor de semana epidemiológica abre toda a série
+  disponível — SG desde 2013, SRAG desde 2019, eSUS desde 2020.
+- **Unidade de Notificação:** atalhos municipais + lista completa de todas as
+  unidades de notificação por extenso com código (SG: `NOME_UNIDA`/`COD_UNID`;
+  SRAG: `ID_UNIDADE`/`CO_UNI_NOT`).
+- **Sazonalidade:** as abas de Nowcasting + Forecasting (SG, SRAG e e-SUS) trazem
+  um histograma da média de casos por semana epidemiológica usando todos os anos.
 
 ## Páginas
 
@@ -42,9 +55,12 @@ nowcasting e forecasting usando o modelo `nowcaster` INLA .
   - Histograma etário
 - **Tab 2 — Nowcasting + Forecasting** — gráfico plotly interativo
 
-### painel lateral(sidebar)
-- Date range filter (DT_DIGITA, padrão 2022–2026)
-- Age range filter (IDADE em SG, NU_IDADE_N em SRAG)
+### e-SUS (COVID-19)
+- Espelha a estrutura de SG/SRAG sobre o banco eSUS-Notifica.
+- Eixo temporal = data dos primeiros sintomas, preenchida pela data de
+  notificação quando vazia (a página acende as visões de sexo/idade
+  automaticamente quando uma fonte mais rica é colocada em `data/eSUS_all.parquet`).
+- **Tabs:** Descritivo · Testes · Nowcasting + Forecasting (com sazonalidade)
 
 ## Rodar localmente
 

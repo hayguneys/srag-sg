@@ -24,6 +24,7 @@ def intro():
 
         - **SG** — Síndrome Gripal · abas: Descritivo · Testes · Nowcasting + Forecasting · Progressão para SRAG
         - **SRAG** — Síndrome Respiratória Aguda Grave · abas: Descritivo (com filtro Casos / Óbitos) · Testes · Nowcasting + Forecasting
+        - **e-SUS** — COVID-19 (eSUS-Notifica) · abas: Descritivo · Testes · Nowcasting + Forecasting
         - **Resumo Executivo** — Sumário rápido das informações do painel
 
         ---
@@ -46,7 +47,7 @@ def intro():
     )
 
     st.markdown("### Acesso Rápido")
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         if st.button("🤧 Nowcasting + Forecasting — SG", width='stretch'):
             st.session_state["sg_goto_nowcasting"] = True
@@ -56,6 +57,10 @@ def intro():
             st.session_state["srag_goto_nowcasting"] = True
             st.switch_page("pages/2_SRAG.py")
     with col3:
+        if st.button("🧬 Nowcasting + Forecasting — e-SUS", width='stretch'):
+            st.session_state["esus_goto_nowcasting"] = True
+            st.switch_page("pages/4_eSUS.py")
+    with col4:
         if st.button("📋 Resumo Executivo", width='stretch'):
             st.switch_page("pages/3_Resumo_Executivo.py")
 
@@ -86,6 +91,7 @@ pg = st.navigation([
     st.Page(intro, title="Introdução", icon="🏠", default=True),
     st.Page("pages/1_SG.py", title="SG", icon="🤧"),
     st.Page("pages/2_SRAG.py", title="SRAG", icon="🫁"),
+    st.Page("pages/4_eSUS.py", title="e-SUS", icon="🧬"),
     st.Page("pages/3_Resumo_Executivo.py", title="Resumo Executivo", icon="📋"),
 ])
 

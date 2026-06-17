@@ -38,6 +38,12 @@ def paho_year_week(dates: pd.Series) -> tuple[pd.Series, pd.Series]:
 EPIWEEK_MIN = (2022, 1)
 EPIWEEK_MAX = (2026, 16)
 
+# Per-page lower bounds for the SE/Ano selector, matching how far back each
+# data source goes: SG from 2013, SRAG from 2019, eSUS-Notifica from 2020.
+SG_EPIWEEK_MIN = (2013, 1)
+SRAG_EPIWEEK_MIN = (2019, 1)
+ESUS_EPIWEEK_MIN = (2020, 1)
+
 
 def epiweek_options(start: tuple[int, int] = EPIWEEK_MIN,
                     end: tuple[int, int] = EPIWEEK_MAX) -> list[tuple[int, int]]:
@@ -381,6 +387,128 @@ def render_ma_chart(
     st.plotly_chart(fig, width='stretch')
 
 
+# --- Seasonality histogram (média histórica por SE) ----------------------
+def render_seasonality_hist(
+    df_all: pd.DataFrame,
+    onset_col: str,
+    titulo: str = "Sazonalidade — Média Histórica por Semana Epidemiológica",
+    value_label: str = "Casos",
+    highlight_year: int | None = None,
+) -> None:
+    """Plot the average number of cases per epidemiological week across all years.
+
+    For every epidemiological week (SE 1…53) the bar height is the mean weekly
+    count computed over **all** years available in ``df_all`` — i.e. the typical
+    seasonal profile. Year/week combinations with no record are counted as zero
+    within each year's observed span so quiet weeks pull the average down
+    correctly. A ±1 standard-deviation band shows year-to-year variability, and
+    the most recent year (or ``highlight_year``) is overlaid as a line so the
+    current season can be compared against the historical norm.
+    """
+    import plotly.graph_objects as go
+
+    d = df_all.copy()
+    d[onset_col] = pd.to_datetime(d[onset_col], errors="coerce")
+    d = d.dropna(subset=[onset_col])
+    if d.empty:
+        st.info("Sem dados para o histograma de sazonalidade.")
+        return
+
+    epi_year, epi_week = paho_year_week(d[onset_col])
+    counts = (
+        pd.DataFrame({"year": epi_year.values, "week": epi_week.values})
+        .groupby(["year", "week"]).size().reset_index(name="n")
+    )
+
+    y_min, y_max = int(epi_year.min()), int(epi_year.max())
+    # Build the full year × week grid (zero-filled) so quiet weeks count as 0.
+    weeks_by_year = (
+        counts.groupby("year")["week"].max().reindex(range(y_min, y_max + 1)).fillna(52)
+    )
+    grid = []
+    for yr in range(y_min, y_max + 1):
+        wk_max = int(max(52, weeks_by_year.get(yr, 52)))
+        for wk in range(1, wk_max + 1):
+            grid.append((yr, wk))
+    grid = pd.DataFrame(grid, columns=["year", "week"])
+    full = grid.merge(counts, on=["year", "week"], how="left")
+    full["n"] = full["n"].fillna(0)
+
+    season = (
+        full.groupby("week")["n"]
+        .agg(media="mean", desvio="std").reset_index().fillna({"desvio": 0})
+        .sort_values("week")
+    )
+    season["media"] = season["media"].round(1)
+    season["hi"] = (season["media"] + season["desvio"]).round(1)
+    season["lo"] = (season["media"] - season["desvio"]).clip(lower=0).round(1)
+
+    weeks = season["week"].tolist()
+    fig = go.Figure()
+
+    # ±1 DP band
+    fig.add_trace(go.Scatter(
+        x=weeks + weeks[::-1],
+        y=season["hi"].tolist() + season["lo"].tolist()[::-1],
+        fill="toself", fillcolor="rgba(150,150,150,0.20)",
+        line=dict(width=0), name="±1 DP (entre anos)", hoverinfo="skip",
+    ))
+
+    # Average bars
+    fig.add_trace(go.Bar(
+        x=weeks, y=season["media"],
+        name=f"Média {y_min}–{y_max}", marker_color="#72B7B2",
+        hovertemplate="SE %{x}<br>Média: %{y:.1f} " + value_label.lower() + "<extra></extra>",
+    ))
+
+    # Highlight the most recent (or requested) year for comparison.
+    hl_year = highlight_year if highlight_year is not None else y_max
+    cur = counts[counts["year"] == hl_year].sort_values("week")
+    if not cur.empty:
+        fig.add_trace(go.Scatter(
+            x=cur["week"], y=cur["n"],
+            name=f"{hl_year}", mode="lines+markers",
+            line=dict(color="#E45756", width=2), marker=dict(size=4),
+            hovertemplate=f"SE %{{x}}/{hl_year}<br>{value_label}: %{{y}}<extra></extra>",
+        ))
+
+    fig.update_layout(
+        title=titulo,
+        xaxis=dict(title="Semana Epidemiológica", dtick=2, tickmode="linear"),
+        yaxis=dict(title=f"Nº {value_label} (média por ano)"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0.5, xanchor="center"),
+        margin=dict(l=20, r=20, t=90, b=60),
+        height=460, plot_bgcolor="white", bargap=0.15,
+    )
+    st.plotly_chart(fig, width='stretch')
+
+
+# --- Notification-unit filter (full list + presets) ----------------------
+def unit_code_map(df: pd.DataFrame, name_col: str, code_col: str | None) -> dict:
+    """Map each notification-unit name to its (most frequent) unit code.
+
+    Used to label the Unidade de Notificação filter "por extenso" with the
+    unit code appended. Returns ``{name: code}``; names with no usable code map
+    to "".
+    """
+    if name_col not in df.columns:
+        return {}
+    if code_col is None or code_col not in df.columns:
+        names = df[name_col].dropna().astype(str).str.strip()
+        return {n: "" for n in names.unique() if n}
+    pair = df[[name_col, code_col]].dropna(subset=[name_col]).copy()
+    pair[name_col] = pair[name_col].astype(str).str.strip()
+    pair = pair[pair[name_col] != ""]
+    pair[code_col] = pair[code_col].astype(str).str.strip().replace(
+        {"nan": "", "None": "", "<NA>": ""}
+    )
+    out: dict = {}
+    for name, grp in pair.groupby(name_col):
+        codes = grp[code_col][grp[code_col] != ""]
+        out[name] = str(codes.mode().iloc[0]) if not codes.empty else ""
+    return out
+
+
 # --- Nowcasting / Forecasting table from htmlwidgets HTML ----------------
 def load_nowcast_table(filename: str) -> "pd.DataFrame | None":
     """Extract the nowcast/forecast estimates (and 95% CI) from a saved
@@ -646,6 +774,53 @@ def load_esus_kpi() -> pd.DataFrame:
         df = pd.read_parquet(path)
         df = df[[c for c in want if c in df.columns]]
     df["datanotificacao"] = pd.to_datetime(df["datanotificacao"], errors="coerce")
+    return df
+
+
+# --- eSUS full loader (for the e-SUS / COVID page) -----------------------
+# Candidate column names (lowercased) for the symptom-onset date in richer
+# eSUS-Notifica exports. The trimmed extract currently shipped has none of
+# these, so the page falls back to the notification date.
+_ESUS_SINTOMA_CANDS = (
+    "datainiciosintomas", "dataprimeirossintomas", "data_inicio_sintomas",
+    "dtsintomas", "dt_sintomas", "datasprimeirossintomas", "dataprimeirosintomas",
+)
+
+
+@st.cache_data(show_spinner="Carregando e-SUS Notifica…")
+def load_esus_page() -> pd.DataFrame:
+    """Load the full eSUS-Notifica extract for the e-SUS page.
+
+    Reads every column so the page lights up automatically when a richer source
+    (with symptom-onset date, idade, sexo, …) is dropped in. The analytic date
+    ``DT_SINTOMAS`` is the data dos primeiros sintomas, filled from the
+    notification date where empty ("primeiros sintomas = notificação quando
+    vazio"); if the source has no symptom column it equals the notification date.
+    """
+    path = DATA_DIR / "eSUS_all.parquet"
+    if not path.exists():
+        st.error(f"Arquivo não encontrado: {path}")
+        st.stop()
+    df = pd.read_parquet(path)
+
+    lower = {c.lower(): c for c in df.columns}
+    notif_col = lower.get("datanotificacao") or lower.get("data_notificacao")
+    sin_col = next((lower[c] for c in _ESUS_SINTOMA_CANDS if c in lower), None)
+
+    notif = (
+        pd.to_datetime(df[notif_col], errors="coerce") if notif_col
+        else pd.Series(pd.NaT, index=df.index)
+    )
+    df["DT_NOTIFIC"] = notif
+    if sin_col is not None:
+        df["DT_SINTOMAS"] = pd.to_datetime(df[sin_col], errors="coerce").fillna(notif)
+        df.attrs["sintoma_source"] = "primeiros sintomas (vazio → notificação)"
+    else:
+        df["DT_SINTOMAS"] = notif
+        df.attrs["sintoma_source"] = "data de notificação (sem coluna de sintomas)"
+
+    if "tipoteste" in df.columns:
+        df["tipoteste"] = df["tipoteste"].astype(str).str.replace("–", "-", regex=False)
     return df
 
 

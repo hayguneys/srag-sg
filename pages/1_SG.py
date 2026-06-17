@@ -12,6 +12,7 @@ from utils.helpers import (
     load_sg, load_sg_srag_linked, render_kpis, fmt_int,
     embed_html_plot, render_ma_chart, render_forecast_table, paho_year_week,
     render_epiweek_slider, filter_epiweek, add_ma_overlay,
+    render_seasonality_hist, unit_code_map, SG_EPIWEEK_MIN,
     CLASSI_FIN_LABELS, CLASSI_FIN_COLORS, inject_test_frames,
 )
 
@@ -40,44 +41,61 @@ _CLINICAS_SG = {
 }
 
 
-# Unidade de saúde dropdown: preset shortcuts + a "Unidades municipais" section
-# header, followed by the individual municipal clinics. Streamlit's multiselect
-# has no native option groups, so the header is a decorative (no-op) option and
-# the presets are resolved in _filtra_clinicas_sg.
+# Unidade de Notificação dropdown: preset shortcuts + a "Unidades municipais"
+# section, then a second section listing EVERY notification unit (NOME_UNIDA)
+# by full name with its unit code (COD_UNID). Streamlit's multiselect has no
+# native option groups, so the section headers are decorative (no-op) options
+# and the selection is resolved in _filtra_clinicas_sg.
 _UNI_TODAS  = "__todas__"
 _UNI_MUNI   = "__municipais__"
 _UNI_EXMUNI = "__exceto_municipais__"
 _UNI_DIV    = "__sec_municipais__"
+_UNI_DIV2   = "__sec_todas__"
 _UNI_LABELS = {
     _UNI_TODAS:  "Todas as unidades",
     _UNI_MUNI:   "Todas as municipais",
     _UNI_EXMUNI: "Todas exceto municipais",
     _UNI_DIV:    "──────  Unidades municipais  ──────",
+    _UNI_DIV2:   "──────  Todas as unidades de notificação  ──────",
 }
-_UNI_OPTIONS = [_UNI_TODAS, _UNI_MUNI, _UNI_EXMUNI, _UNI_DIV] + list(_CLINICAS_SG.keys())
+
+# name -> unit code, and the full sorted list of notification-unit names.
+_SG_UNIT_CODE = unit_code_map(df_all, "NOME_UNIDA", "COD_UNID")
+_SG_UNIT_NAMES = sorted(_SG_UNIT_CODE.keys())
+_UNI_OPTIONS = (
+    [_UNI_TODAS, _UNI_MUNI, _UNI_EXMUNI, _UNI_DIV]
+    + list(_CLINICAS_SG.keys())
+    + [_UNI_DIV2]
+    + _SG_UNIT_NAMES
+)
 
 
 def _uni_label(opt):
-    return _UNI_LABELS.get(opt, opt)
+    if opt in _UNI_LABELS:
+        return _UNI_LABELS[opt]
+    if opt in _CLINICAS_SG:
+        return opt
+    code = _SG_UNIT_CODE.get(opt, "")
+    return f"{opt} · cód. {code}" if code else opt
 
 
 def _unidade_multiselect(key):
-    """Render the Unidade de saúde selector with presets + municipal section."""
+    """Render the Unidade de Notificação selector (presets + full unit list)."""
     return st.multiselect(
-        "Unidade de saúde", _UNI_OPTIONS,
+        "Unidade de Notificação", _UNI_OPTIONS,
         default=[], key=key, format_func=_uni_label,
         placeholder="Todas as unidades",
     )
 
 
 def _filtra_clinicas_sg(df, selecionadas):
-    """Resolve the unidade selection (presets + clinics) into a row filter.
+    """Resolve the unidade selection (presets + clinics + named units) into a filter.
 
-    Empty, "Todas as unidades", or only the section header => no filtering.
+    Empty, "Todas as unidades", or only section headers => no filtering.
     """
     if "NOME_UNIDA" not in df.columns:
         return df
-    sel = [s for s in (selecionadas or []) if s != _UNI_DIV]
+    sel = [s for s in (selecionadas or []) if s not in (_UNI_DIV, _UNI_DIV2)]
     if not sel or _UNI_TODAS in sel:
         return df
 
@@ -96,6 +114,11 @@ def _filtra_clinicas_sg(df, selecionadas):
     _indiv_kw = [_CLINICAS_SG[c] for c in sel if c in _CLINICAS_SG]
     if _indiv_kw:
         mask = mask | _nm.apply(lambda x: any(k in x for k in _indiv_kw))
+        matched = True
+    # Exact full-name selections from the "Todas as unidades de notificação" list.
+    _exact = {s.upper().strip() for s in sel if s in _SG_UNIT_CODE}
+    if _exact:
+        mask = mask | _nm.isin(_exact)
         matched = True
 
     if not matched:
@@ -141,7 +164,7 @@ with tab1:
     # ---- SE/Ano range slider and unit filter --------------------------------
     _c_year, _c_unit = st.columns([2, 2])
     with _c_year:
-        _se_lo, _se_hi = render_epiweek_slider("sg_desc_se")
+        _se_lo, _se_hi = render_epiweek_slider("sg_desc_se", start=SG_EPIWEEK_MIN)
     with _c_unit:
         _unit_filter = _unidade_multiselect("sg_desc_unit")
 
@@ -251,6 +274,7 @@ with tab1:
         _sum_age = df_filt.copy()
         _sum_age["IDADE"] = pd.to_numeric(_sum_age["IDADE"], errors="coerce")
         _sum_age = _sum_age.dropna(subset=["IDADE"])
+        _sum_age["faixa"] = pd.NA  # ensure column exists (empty-frame safe)
         for _lbl, _msk in FAIXA_BINS:
             _sum_age.loc[_msk(_sum_age["IDADE"]), "faixa"] = _lbl
         _sum_age = _sum_age.dropna(subset=["faixa"])
@@ -308,6 +332,7 @@ with tab1:
     _age = df_filt.copy()
     _age["IDADE"] = pd.to_numeric(_age["IDADE"], errors="coerce")
     _age = _age.dropna(subset=["DT_PRISINT", "IDADE"])
+    _age["faixa"] = pd.NA  # ensure column exists (empty-frame safe)
     for _label, _mask in FAIXA_BINS:
         _age.loc[_mask(_age["IDADE"]), "faixa"] = _label
     _age = _age.dropna(subset=["faixa"])
@@ -458,7 +483,7 @@ with tab2:
     # ---- SE/Ano range slider and unit filter --------------------------------
     _t2_cy, _t2_cu = st.columns([2, 2])
     with _t2_cy:
-        _t2_se_lo, _t2_se_hi = render_epiweek_slider("sg_test_se")
+        _t2_se_lo, _t2_se_hi = render_epiweek_slider("sg_test_se", start=SG_EPIWEEK_MIN)
     with _t2_cu:
         _t2_unit = _unidade_multiselect("sg_test_unit")
 
@@ -684,6 +709,17 @@ with tab3:
     st.caption(f"Fonte: {_FONTE_SG}")
 
     st.markdown("---")
+    st.markdown("### Sazonalidade — Média Histórica por Semana Epidemiológica")
+    st.caption(
+        "Média de casos por semana epidemiológica usando todos os anos disponíveis "
+        "(2013–2026) por semana de início dos sintomas (`DT_PRISINT`). A faixa cinza "
+        "mostra ±1 desvio-padrão entre anos; a linha destaca o ano mais recente."
+    )
+    render_seasonality_hist(df_all, onset_col="DT_PRISINT",
+                            titulo="Sazonalidade — SG (média por SE, todos os anos)")
+    st.caption(f"Fonte: {_FONTE_SG}")
+
+    st.markdown("---")
     st.markdown("### Semanas previstas")
     render_forecast_table("nowcasting_sg.html")
     st.caption(f"Fonte: {_FONTE_SG}")
@@ -752,6 +788,7 @@ with tab4:
             ]
             _PROG_FAIXA_ORDER = [l for l, _ in _PROG_FAIXA_BINS]
             _age_p = _prog.dropna(subset=["_idade"]).copy()
+            _age_p["faixa"] = pd.NA  # ensure column exists (empty-frame safe)
             for _lbl, _msk in _PROG_FAIXA_BINS:
                 _age_p.loc[_msk(_age_p["_idade"]), "faixa"] = _lbl
             _age_p = _age_p.dropna(subset=["faixa"])
