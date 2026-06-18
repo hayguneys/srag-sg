@@ -60,8 +60,7 @@ _TIPOTESTE_COL = _col("tipoteste")
 _RESULT_COL = _col("resultadofinal", "resultado", "resultadoteste")
 
 if st.session_state.pop("esus_goto_nowcasting", False):
-    import streamlit.components.v1 as components
-    components.html("""<script>
+    st.html("""<script>
     (function() {
         function clickTab() {
             var tabs = window.parent.document.querySelectorAll('[role="tab"]');
@@ -70,7 +69,7 @@ if st.session_state.pop("esus_goto_nowcasting", False):
         }
         setTimeout(clickTab, 300);
     })();
-    </script>""", height=0)
+    </script>""", unsafe_allow_javascript=True)
 
 # Resultado labels / colors for the weekly stacked bars.
 _RES_COLORS = {

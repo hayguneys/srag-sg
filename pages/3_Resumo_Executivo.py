@@ -5,7 +5,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 from utils.helpers import (
     load_srag_withna, load_esus_kpi,
@@ -198,8 +197,5 @@ else:
         horizontal=True, key="resumo_distrito_metric", label_visibility="collapsed",
     )
     _col = "taxa" if _view.startswith("Taxa") else "n"
-    components.html(
-        _folium_choropleth_distritos(_dist_data, color_col=_col),
-        height=920, scrolling=False,
-    )
+    st.html(_folium_choropleth_distritos(_dist_data, color_col=_col), unsafe_allow_javascript=True)
     st.caption("Fonte: SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP-GRIPE · Pop. IBGE Censo 2022.")

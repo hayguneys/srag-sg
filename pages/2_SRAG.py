@@ -133,8 +133,7 @@ _FONTE_SRAG = "SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP-GRIPE"
 _RECIFE_POP = 1_640_147
 
 if st.session_state.pop("srag_goto_nowcasting", False):
-    import streamlit.components.v1 as components
-    components.html("""<script>
+    st.html("""<script>
     (function() {
         function clickTab() {
             var tabs = window.parent.document.querySelectorAll('[role="tab"]');
@@ -143,7 +142,7 @@ if st.session_state.pop("srag_goto_nowcasting", False):
         }
         setTimeout(clickTab, 300);
     })();
-    </script>""", height=0)
+    </script>""", unsafe_allow_javascript=True)
 
 _SRAG_RACA_LABELS = {1: "Branca", 2: "Preta", 3: "Amarela", 4: "Parda", 5: "Indígena", 9: "Ignorado"}
 _SRAG_CLASSI = {
@@ -348,8 +347,6 @@ def _render_srag_obitos_extras(df_view):
     else:
         import folium
         from folium.plugins import HeatMap
-        import streamlit.components.v1 as _components
-
         # Join deaths with lookup on NM_BAIRRO (upper/stripped)
         _ob_map = _ob.copy()
         _ob_map["_raw"] = _ob_map["NM_BAIRRO"].str.strip().str.upper().fillna("")
@@ -398,8 +395,10 @@ def _render_srag_obitos_extras(df_view):
                     tooltip=f"{_row['official']}: {int(_row['weight'])} óbitos",
                 ).add_to(_fmap)
 
-            _map_html = _fmap._repr_html_()
-            _components.html(_map_html, height=520, scrolling=False)
+            import folium as _folium_fig
+            _fmap_fig = _folium_fig.Figure(width="100%", height="520px")
+            _fmap.add_to(_fmap_fig)
+            st.html(_fmap_fig._repr_html_(), unsafe_allow_javascript=True)
 
             st.caption(
                 f"{len(_ob_geo):,} de {len(_ob_map):,} óbitos geolocalizados "
@@ -688,6 +687,94 @@ with tab1:
 
     st.markdown("---")
 
+    # ---- Taxa de Incidência por Semana Epidemiológica ----------------------
+    st.markdown("#### Taxa de Incidência por Semana Epidemiológica (por 100.000 hab.)")
+
+    _inc_base = df_view.dropna(subset=["DT_SIN_PRI"]).copy()
+    if _inc_base.empty:
+        st.info("Sem dados para calcular taxa de incidência.")
+    else:
+        if _faixa_view == "Total":
+            _yr_inc, _wk_inc = paho_year_week(_inc_base["DT_SIN_PRI"])
+            _inc_base["semana"]      = "SE " + _wk_inc.astype(str).str.zfill(2) + "/" + _yr_inc.astype(str)
+            _inc_base["semana_sort"] = _yr_inc * 100 + _wk_inc
+            _agg_inc = _inc_base.groupby(["semana", "semana_sort"]).size().reset_index(name="n")
+            _agg_inc = _agg_inc.sort_values("semana_sort").reset_index(drop=True)
+            _agg_inc["taxa"] = (_agg_inc["n"] / _RECIFE_POP * 100_000).round(2)
+            _agg_inc["ma"]   = _agg_inc["taxa"].rolling(4, min_periods=1).mean().round(2)
+
+            _fig_inc = go.Figure()
+            _fig_inc.add_trace(go.Bar(
+                x=_agg_inc["semana"], y=_agg_inc["taxa"],
+                name="Taxa por SE", marker_color="#4C78A8",
+                hovertemplate="%{x}<br>Taxa: %{y:.2f} por 100k<extra></extra>",
+            ))
+            _fig_inc.add_trace(go.Scatter(
+                x=_agg_inc["semana"], y=_agg_inc["ma"],
+                name="Média móvel 4 SE", mode="lines",
+                line=dict(color="#E45756", width=2, dash="dot"),
+                hovertemplate="%{x}<br>MM4: %{y:.2f}<extra></extra>",
+            ))
+            _fig_inc.update_layout(xaxis=dict(categoryorder="array", categoryarray=_agg_inc["semana"].tolist()))
+        else:
+            _inc_grp = _inc_base.copy()
+            if _faixa_view == "Faixa Etária":
+                _inc_grp["NU_IDADE_N"] = pd.to_numeric(_inc_grp["NU_IDADE_N"], errors="coerce")
+                _inc_grp = _inc_grp.dropna(subset=["NU_IDADE_N"])
+                _inc_grp["_grp"] = pd.NA
+                for _lbl, _msk in FAIXA_BINS:
+                    _inc_grp.loc[_msk(_inc_grp["NU_IDADE_N"]), "_grp"] = _lbl
+                _inc_grp = _inc_grp.dropna(subset=["_grp"])
+                _grp_order  = [l for l, _ in FAIXA_BINS]
+                _grp_colors = FAIXA_COLORS
+                _grp_label  = "Faixa Etária"
+            elif _faixa_view == "Sexo":
+                _inc_grp = _inc_grp[_inc_grp["CS_SEXO"].isin(["M", "F"])].copy()
+                _inc_grp["_grp"] = _inc_grp["CS_SEXO"].map({"M": "Masculino", "F": "Feminino"})
+                _grp_order  = ["Masculino", "Feminino"]
+                _grp_colors = {"Masculino": "#4C78A8", "Feminino": "#E45756"}
+                _grp_label  = "Sexo"
+            else:  # Raça/Cor
+                _inc_grp["_grp"] = pd.to_numeric(_inc_grp["CS_RACA"], errors="coerce").map(_SRAG_RACA_LABELS)
+                _inc_grp = _inc_grp.dropna(subset=["_grp"])
+                _grp_order  = list(_SRAG_RACA_LABELS.values())
+                _grp_colors = RACA_COLORS
+                _grp_label  = "Raça/Cor"
+
+            _yr_inc, _wk_inc = paho_year_week(_inc_grp["DT_SIN_PRI"])
+            _inc_grp["semana"]      = "SE " + _wk_inc.astype(str).str.zfill(2) + "/" + _yr_inc.astype(str)
+            _inc_grp["semana_sort"] = _yr_inc * 100 + _wk_inc
+            _agg_inc = _inc_grp.groupby(["semana", "semana_sort", "_grp"]).size().reset_index(name="n")
+            _agg_inc["taxa"] = (_agg_inc["n"] / _RECIFE_POP * 100_000).round(2)
+            _ord_inc     = _agg_inc[["semana","semana_sort"]].drop_duplicates().sort_values("semana_sort")["semana"].tolist()
+            _present_inc = [l for l in _grp_order if l in _agg_inc["_grp"].unique()]
+
+            _fig_inc = px.bar(
+                _agg_inc, x="semana", y="taxa", color="_grp",
+                color_discrete_map=_grp_colors,
+                labels={"semana": "Semana Epidemiológica", "taxa": "Taxa por 100.000 hab.", "_grp": _grp_label},
+                category_orders={"semana": _ord_inc, "_grp": _present_inc},
+            )
+            _ma_src = _agg_inc.groupby(["semana","semana_sort"])["taxa"].sum().reset_index().rename(columns={"taxa": "n"})
+            add_ma_overlay(_fig_inc, _ma_src)
+
+        _fig_inc.update_layout(
+            barmode="stack",
+            xaxis_tickangle=-90,
+            yaxis=dict(title="Taxa por 100.000 hab.", rangemode="tozero"),
+            legend=dict(orientation="h", y=-0.28, x=0.5, xanchor="center"),
+            margin=dict(l=20, r=20, t=50, b=110),
+            height=500,
+            plot_bgcolor="white",
+        )
+        st.plotly_chart(_fig_inc, width='stretch')
+        st.caption(
+            f"Fonte: {_FONTE_SRAG} · Pop. IBGE Censo 2022 "
+            f"(Recife: {_RECIFE_POP:,} hab.)".replace(",", ".")
+        )
+
+    st.markdown("---")
+
     # ---- Mapa por Distrito Sanitário ---------------------------------------
     _map_title = (
         "Óbitos por Distrito Sanitário" if _show_obitos
@@ -695,7 +782,6 @@ with tab1:
     )
     st.markdown(f"#### {_map_title}")
 
-    import streamlit.components.v1 as _cmp
     from utils.helpers import load_bairro_distrito, _folium_choropleth_distritos, _DISTRITO_NAMES
 
     @st.cache_data(show_spinner="Calculando incidência por distrito…")
@@ -739,7 +825,7 @@ with tab1:
         st.info("Sem dados de distrito para os filtros selecionados.")
     else:
         _srag_dist_plot = _srag_dist[["distrito", "n", "taxa"]].copy()
-        _cmp.html(_folium_choropleth_distritos(_srag_dist_plot, color_col=_srag_map_col), height=920, scrolling=False)
+        st.html(_folium_choropleth_distritos(_srag_dist_plot, color_col=_srag_map_col), unsafe_allow_javascript=True)
         st.caption(f"Fonte: {_FONTE_SRAG}" + ("" if _show_obitos else " · Pop. IBGE Censo 2022."))
 
     # ---- Óbitos-only extras: hospital/classificação, timeline, heatmap, tabela

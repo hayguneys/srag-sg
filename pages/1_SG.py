@@ -144,8 +144,7 @@ _SG_RACA_COLORS = {
 
 
 if st.session_state.pop("sg_goto_nowcasting", False):
-    import streamlit.components.v1 as components
-    components.html("""<script>
+    st.html("""<script>
     (function() {
         function clickTab() {
             var tabs = window.parent.document.querySelectorAll('[role="tab"]');
@@ -154,7 +153,7 @@ if st.session_state.pop("sg_goto_nowcasting", False):
         }
         setTimeout(clickTab, 300);
     })();
-    </script>""", height=0)
+    </script>""", unsafe_allow_javascript=True)
 
 tab1, tab2, tab3, tab4 = st.tabs(["📊 Descritivo", "🧪 Testes", "📈 Nowcasting + Forecasting", "Progressão para SRAG"])
 

@@ -1,8 +1,4 @@
-# Pinned to avoid auto-upgrading onto bleeding-edge releases on redeploy.
-# streamlit 1.58.0 regressed on Streamlit Community Cloud (Uvicorn server
-# /healthz "connection reset by peer" → "Error running app"); 1.57.0 is the
-# last-known-good release. Bump deliberately after testing, not automatically.
-streamlit==1.57.0
+streamlit==1.58.0
 pandas>=2.0,<4
 pyarrow>=14.0
 plotly>=5.18

@@ -755,7 +755,7 @@ _DISTRITO_NAMES = {
 _CRIMSON_STEPS = ["#fdf2f1", "#f5c6c2", "#e8827b", "#d94f45", "#b52d24", "#8b1a14", "#6b0001"]
 
 
-def _folium_choropleth_distritos(data: pd.DataFrame, color_col: str = "n") -> str:
+def _folium_choropleth_distritos(data: pd.DataFrame, color_col: str = "n", height: int = 920) -> str:
     """Return folium HTML string: district-level choropleth on Leaflet/OSM."""
     import json
     import folium
@@ -917,7 +917,9 @@ def _folium_choropleth_distritos(data: pd.DataFrame, color_col: str = "n") -> st
             ),
         ).add_to(m)
 
-    return m._repr_html_()
+    fig = folium.Figure(width="100%", height=f"{height}px")
+    m.add_to(fig)
+    return fig._repr_html_()
 
 
 # --- Bairro → Distrito Sanitário lookup ---------------------------------
@@ -1059,7 +1061,6 @@ def embed_html_plot(filename: str, height: int = 700, fix_legend: bool = False) 
     series labels are spaced out instead of overlapping on a single point.
     """
     import re
-    import streamlit.components.v1 as components
 
     path = PLOTS_DIR / filename
     if not path.exists():
@@ -1087,4 +1088,4 @@ def embed_html_plot(filename: str, height: int = 700, fix_legend: bool = False) 
     html = re.sub(r'<link[^>]+href="([^"]+\.css)"[^>]*/?>',  _inline_css, html)
     html = re.sub(r'<script\s+src="([^"]+)"[^>]*></script>', _inline_js,  html)
 
-    components.html(html, height=height, scrolling=True)
+    st.html(html, unsafe_allow_javascript=True)
