@@ -197,5 +197,5 @@ else:
         horizontal=True, key="resumo_distrito_metric", label_visibility="collapsed",
     )
     _col = "taxa" if _view.startswith("Taxa") else "n"
-    st.html(_folium_choropleth_distritos(_dist_data, color_col=_col), unsafe_allow_javascript=True)
+    st.iframe(_folium_choropleth_distritos(_dist_data, color_col=_col), height=920)
     st.caption("Fonte: SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP-GRIPE · Pop. IBGE Censo 2022.")

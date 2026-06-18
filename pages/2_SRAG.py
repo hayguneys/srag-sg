@@ -398,7 +398,7 @@ def _render_srag_obitos_extras(df_view):
             import folium as _folium_fig
             _fmap_fig = _folium_fig.Figure(width="100%", height="520px")
             _fmap.add_to(_fmap_fig)
-            st.html(_fmap_fig._repr_html_(), unsafe_allow_javascript=True)
+            st.iframe(_fmap_fig._repr_html_(), height=520)
 
             st.caption(
                 f"{len(_ob_geo):,} de {len(_ob_map):,} óbitos geolocalizados "
@@ -825,7 +825,7 @@ with tab1:
         st.info("Sem dados de distrito para os filtros selecionados.")
     else:
         _srag_dist_plot = _srag_dist[["distrito", "n", "taxa"]].copy()
-        st.html(_folium_choropleth_distritos(_srag_dist_plot, color_col=_srag_map_col), unsafe_allow_javascript=True)
+        st.iframe(_folium_choropleth_distritos(_srag_dist_plot, color_col=_srag_map_col), height=920)
         st.caption(f"Fonte: {_FONTE_SRAG}" + ("" if _show_obitos else " · Pop. IBGE Censo 2022."))
 
     # ---- Óbitos-only extras: hospital/classificação, timeline, heatmap, tabela

@@ -1092,4 +1092,4 @@ def embed_html_plot(filename: str, height: int = 700, fix_legend: bool = False) 
     html = re.sub(r'<link[^>]+href="([^"]+\.css)"[^>]*/?>',  _inline_css, html)
     html = re.sub(r'<script\s+src="([^"]+)"[^>]*></script>', _inline_js,  html)
 
-    st.html(html, unsafe_allow_javascript=True)
+    st.iframe(html, height=height)
