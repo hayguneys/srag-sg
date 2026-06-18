@@ -10,13 +10,23 @@ import streamlit as st
 def paho_year_week(dates: pd.Series) -> tuple[pd.Series, pd.Series]:
     """Return (epi_year, epi_week) using the PAHO/MMWR Sunday-start system."""
     dates = pd.to_datetime(dates)
+    if len(dates) == 0:
+        # Empty input (e.g. a slider range with no matching rows): return empty
+        # int Series so callers' arithmetic/grouping degrade to empty, not crash.
+        empty = pd.Series([], dtype="int64", index=dates.index)
+        return empty, empty.copy()
     dow   = dates.dt.weekday                              # Mon=0 … Sun=6
     sun   = (dates - pd.to_timedelta((dow + 1) % 7, unit="D")).dt.normalize()
 
-    cal_years = set(sun.dt.year.unique())
-    cal_years |= {y - 1 for y in cal_years} | {y + 1 for y in cal_years}
+    # Build the week-1 Sunday lookup over a ±2-year margin around the observed
+    # span. A late-December date can belong to the *next* epi-year, and the
+    # adjustment passes below can shift epiyear up to ±2 from the calendar year;
+    # covering that margin guarantees w1 always has the anchor (otherwise the map
+    # misses, the NaT comparison shifts again, and the final astype(int) hits NaN).
+    yrs = sun.dt.year
+    y_lo, y_hi = int(yrs.min()), int(yrs.max())
     w1 = {}
-    for y in cal_years:
+    for y in range(y_lo - 2, y_hi + 3):
         j4 = pd.Timestamp(y, 1, 4)
         w1[y] = j4 - pd.Timedelta(days=(j4.weekday() + 1) % 7)
 
@@ -131,12 +141,22 @@ def render_epiweek_slider(
                 new_lo, new_hi = new_hi, new_lo
             st.session_state[_sk] = (new_lo, new_hi)
 
-    # Initialise all five keys on first load
-    if _sk not in st.session_state:
-        st.session_state[_sk] = (labels[0], labels[-1])
-    sl_lo, sl_hi = st.session_state[_sk]
-    if sl_lo not in labels: sl_lo = labels[0]
-    if sl_hi not in labels: sl_hi = labels[-1]
+    # Canonicalise the stored slider value to a valid (lo, hi) label pair before
+    # the widget renders. A keyed select_slider without an explicit ``value``
+    # writes back a single label between runs, so on the next rerun the stored
+    # value is a bare string — which both crashes the unpack and collapses the
+    # range. Re-seeding a 2-tuple here keeps it a proper range slider every run
+    # (e.g. a second slider on the page that the user never touched).
+    raw = st.session_state.get(_sk)
+    if isinstance(raw, (list, tuple)) and len(raw) == 2 and all(v in labels for v in raw):
+        sl_lo, sl_hi = raw
+    elif isinstance(raw, str) and raw in labels:
+        sl_lo = sl_hi = raw
+    else:
+        sl_lo, sl_hi = labels[0], labels[-1]
+    if labels.index(sl_lo) > labels.index(sl_hi):
+        sl_lo, sl_hi = sl_hi, sl_lo
+    st.session_state[_sk] = (sl_lo, sl_hi)
     lo_y0, lo_w0 = opts[labels.index(sl_lo)]
     hi_y0, hi_w0 = opts[labels.index(sl_hi)]
     if _lo_y not in st.session_state: st.session_state[_lo_y] = lo_y0
@@ -162,9 +182,13 @@ def render_epiweek_slider(
         st.selectbox("SE final", hi_weeks, key=_hi_w, on_change=_select_changed)
 
     # --- Slider -------------------------------------------------------------
-    lbl_lo, lbl_hi = st.select_slider(
+    sel = st.select_slider(
         label, options=labels, key=_sk, on_change=_slider_changed,
     )
+    if isinstance(sel, (list, tuple)) and len(sel) == 2:
+        lbl_lo, lbl_hi = sel
+    else:                               # single-value fallback (never a range)
+        lbl_lo = lbl_hi = sel if sel in labels else labels[0]
     return opts[labels.index(lbl_lo)], opts[labels.index(lbl_hi)]
 
 
