@@ -208,19 +208,19 @@ with tab1:
 
     with _pc3:
         if _BAIRRO_COL:
-            _bc = df_filt[_BAIRRO_COL].astype(str).str.title().value_counts().head(15).reset_index()
+            _bc = df_filt[_BAIRRO_COL].astype(str).str.title().value_counts().reset_index()
             _bc.columns = ["bairro", "n"]
             _bc = _bc[~_bc["bairro"].str.upper().isin(["", "SN", "NAN", "NONE"])]
             if _bc.empty:
                 st.info("Sem dados de bairro.")
             else:
-                st.markdown("**Por Bairro (top 15)**")
+                st.markdown("**Por Bairro**")
                 _fig = px.bar(_bc, x="n", y="bairro", orientation="h",
                               labels={"bairro": "", "n": "Notificações"},
                               color_discrete_sequence=["#F58518"])
                 _fig.update_layout(yaxis=dict(autorange="reversed"),
                                    margin=dict(l=10, r=10, t=10, b=10),
-                                   height=max(280, len(_bc) * 24))
+                                   height=max(280, len(_bc) * 22))
                 with st.container(height=320, border=False):
                     st.plotly_chart(_fig, width='stretch')
         else:
