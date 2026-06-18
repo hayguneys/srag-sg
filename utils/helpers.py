@@ -1014,6 +1014,20 @@ def load_esus_page() -> pd.DataFrame:
     return df
 
 
+@st.cache_data(show_spinner="Carregando eSUS — Recife…")
+def load_esus_recife() -> pd.DataFrame:
+    """Load the Recife-filtered eSUS extract (esus_recife.parquet).
+
+    Contains bairro, sexo, idade, DT_SINTOMAS, DT_NOTIFIC, resultadofinal,
+    tipoteste — DT_SINTOMAS is filled from DT_NOTIFIC where empty.
+    """
+    path = DATA_DIR / "esus_recife.parquet"
+    if not path.exists():
+        st.error(f"Arquivo não encontrado: {path}")
+        st.stop()
+    return pd.read_parquet(path)
+
+
 # --- HTML plot embed -----------------------------------------------------
 def _fix_nowcast_legend(html: str) -> str:
     """Repair the legend in a ggplotly nowcasting widget.

@@ -19,7 +19,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from utils.helpers import (
-    load_esus_page, render_kpis, fmt_int, paho_year_week,
+    load_esus_recife, render_kpis, fmt_int, paho_year_week,
     period_compare_label, period_compare_se_label, format_kpi_delta,
     render_epiweek_slider, filter_epiweek, add_ma_overlay,
     render_ma_chart, render_seasonality_hist, embed_html_plot,
@@ -36,8 +36,7 @@ st.caption(
 _FONTE_ESUS = "SESAU/SEVS/GGAM/GEVEPI/DDT/ESUS-NOTIFICA"
 
 # --- Load data --------------------------------------------------------------
-df_raw = load_esus_page()
-df_all = df_raw.copy()
+df_all = load_esus_recife()
 
 # --- Detect optional columns (present only in a richer source) --------------
 _cols = {c.lower(): c for c in df_all.columns}
