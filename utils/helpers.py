@@ -92,104 +92,53 @@ def render_epiweek_slider(
     start: tuple[int, int] = EPIWEEK_MIN,
     end: tuple[int, int] = EPIWEEK_MAX,
 ) -> tuple[tuple[int, int], tuple[int, int]]:
-    """Render year/week selectboxes + SE/Ano range slider; return (se_lo, se_hi).
-
-    Bidirectional sync via on_change callbacks:
-    - Slider moved  → _slider_changed writes the four selectbox keys.
-    - Selectbox changed → _select_changed writes the slider key.
-    Both callbacks run before the next script re-execution, so each widget
-    always reflects the other's latest value.
-    """
-    opts   = epiweek_options(start, end)
-    labels = [epiweek_label(y, w) for y, w in opts]
+    """Render four year/week selectboxes for SE range; return (se_lo, se_hi)."""
+    opts      = epiweek_options(start, end)
     all_years = sorted(set(y for y, w in opts))
 
-    _sk   = key                    # slider key
     _lo_y = f"{key}_sel_lo_y"
     _lo_w = f"{key}_sel_lo_w"
     _hi_y = f"{key}_sel_hi_y"
     _hi_w = f"{key}_sel_hi_w"
 
-    def _slider_changed():
-        val = st.session_state.get(_sk)
-        if not (isinstance(val, (list, tuple)) and len(val) == 2):
-            return
-        lo_lbl, hi_lbl = val
-        if lo_lbl in labels and hi_lbl in labels:
-            lo_y, lo_w = opts[labels.index(lo_lbl)]
-            hi_y, hi_w = opts[labels.index(hi_lbl)]
-            st.session_state[_lo_y] = lo_y
-            st.session_state[_lo_w] = lo_w
-            st.session_state[_hi_y] = hi_y
-            st.session_state[_hi_w] = hi_w
+    if _lo_y not in st.session_state: st.session_state[_lo_y] = opts[0][0]
+    if _lo_w not in st.session_state: st.session_state[_lo_w] = opts[0][1]
+    if _hi_y not in st.session_state: st.session_state[_hi_y] = opts[-1][0]
+    if _hi_w not in st.session_state: st.session_state[_hi_w] = opts[-1][1]
 
-    def _select_changed():
-        lo_y   = st.session_state.get(_lo_y, all_years[0])
+    def _year_changed():
+        lo_y  = st.session_state.get(_lo_y, all_years[0])
         lo_wks = [w for y, w in opts if y == lo_y]
-        lo_w   = st.session_state.get(_lo_w)
-        if lo_w not in lo_wks:
-            lo_w = lo_wks[0] if lo_wks else 1
-        hi_y   = st.session_state.get(_hi_y, all_years[-1])
+        if st.session_state.get(_lo_w) not in lo_wks:
+            st.session_state[_lo_w] = lo_wks[0] if lo_wks else 1
+        hi_y  = st.session_state.get(_hi_y, all_years[-1])
         hi_wks = [w for y, w in opts if y == hi_y]
-        hi_w   = st.session_state.get(_hi_w)
-        if hi_w not in hi_wks:
-            hi_w = hi_wks[-1] if hi_wks else 52
-        new_lo = epiweek_label(lo_y, lo_w)
-        new_hi = epiweek_label(hi_y, hi_w)
-        if new_lo in labels and new_hi in labels:
-            if labels.index(new_lo) > labels.index(new_hi):
-                new_lo, new_hi = new_hi, new_lo
-            st.session_state[_sk] = (new_lo, new_hi)
+        if st.session_state.get(_hi_w) not in hi_wks:
+            st.session_state[_hi_w] = hi_wks[-1] if hi_wks else 52
 
-    # Canonicalise the stored slider value to a valid (lo, hi) label pair before
-    # the widget renders. A keyed select_slider without an explicit ``value``
-    # writes back a single label between runs, so on the next rerun the stored
-    # value is a bare string — which both crashes the unpack and collapses the
-    # range. Re-seeding a 2-tuple here keeps it a proper range slider every run
-    # (e.g. a second slider on the page that the user never touched).
-    raw = st.session_state.get(_sk)
-    if isinstance(raw, (list, tuple)) and len(raw) == 2 and all(v in labels for v in raw):
-        sl_lo, sl_hi = raw
-    elif isinstance(raw, str) and raw in labels:
-        sl_lo = sl_hi = raw
-    else:
-        sl_lo, sl_hi = labels[0], labels[-1]
-    if labels.index(sl_lo) > labels.index(sl_hi):
-        sl_lo, sl_hi = sl_hi, sl_lo
-    st.session_state[_sk] = (sl_lo, sl_hi)
-    lo_y0, lo_w0 = opts[labels.index(sl_lo)]
-    hi_y0, hi_w0 = opts[labels.index(sl_hi)]
-    if _lo_y not in st.session_state: st.session_state[_lo_y] = lo_y0
-    if _lo_w not in st.session_state: st.session_state[_lo_w] = lo_w0
-    if _hi_y not in st.session_state: st.session_state[_hi_y] = hi_y0
-    if _hi_w not in st.session_state: st.session_state[_hi_w] = hi_w0
-
-    # --- Selectboxes --------------------------------------------------------
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.selectbox("Ano inicial", all_years, key=_lo_y, on_change=_select_changed)
+        st.selectbox("Ano inicial", all_years, key=_lo_y, on_change=_year_changed)
     lo_weeks = [w for y, w in opts if y == st.session_state[_lo_y]]
-    if st.session_state.get(_lo_w) not in lo_weeks:
+    if st.session_state[_lo_w] not in lo_weeks:
         st.session_state[_lo_w] = lo_weeks[0] if lo_weeks else 1
     with c2:
-        st.selectbox("SE inicial", lo_weeks, key=_lo_w, on_change=_select_changed)
+        st.selectbox("SE inicial", lo_weeks, key=_lo_w)
     with c3:
-        st.selectbox("Ano final", all_years, key=_hi_y, on_change=_select_changed)
+        st.selectbox("Ano final", all_years, key=_hi_y, on_change=_year_changed)
     hi_weeks = [w for y, w in opts if y == st.session_state[_hi_y]]
-    if st.session_state.get(_hi_w) not in hi_weeks:
+    if st.session_state[_hi_w] not in hi_weeks:
         st.session_state[_hi_w] = hi_weeks[-1] if hi_weeks else 52
     with c4:
-        st.selectbox("SE final", hi_weeks, key=_hi_w, on_change=_select_changed)
+        st.selectbox("SE final", hi_weeks, key=_hi_w)
 
-    # --- Slider -------------------------------------------------------------
-    sel = st.select_slider(
-        label, options=labels, key=_sk, on_change=_slider_changed,
-    )
-    if isinstance(sel, (list, tuple)) and len(sel) == 2:
-        lbl_lo, lbl_hi = sel
-    else:                               # single-value fallback (never a range)
-        lbl_lo = lbl_hi = sel if sel in labels else labels[0]
-    return opts[labels.index(lbl_lo)], opts[labels.index(lbl_hi)]
+    lo_y = st.session_state[_lo_y]
+    lo_w = st.session_state[_lo_w]
+    hi_y = st.session_state[_hi_y]
+    hi_w = st.session_state[_hi_w]
+    if (lo_y * 100 + lo_w) > (hi_y * 100 + hi_w):
+        lo_y, lo_w, hi_y, hi_w = hi_y, hi_w, lo_y, lo_w
+    return (lo_y, lo_w), (hi_y, hi_w)
 
 
 def filter_epiweek(df: pd.DataFrame, date_col: str,
