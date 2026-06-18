@@ -30,19 +30,14 @@ st.set_page_config(page_title="Covid-19", page_icon="🧬", layout="wide")
 st.title("🧬 Covid-19 — e-SUS Notifica")
 st.caption(
     "*Notificações de Síndrome Gripal no eSUS-Notifica (COVID-19). Eixo temporal "
-    "pela data dos primeiros sintomas, preenchida pela data de notificação quando "
-    "ausente. Município de notificação = Recife.*"
+    "pela data dos primeiros sintomas, preenchida pela data de notificação quando ausente.*"
 )
 
 _FONTE_ESUS = "SESAU/SEVS/GGAM/GEVEPI/DDT/ESUS-NOTIFICA"
 
-# --- Load data — município de notificação = Recife --------------------------
+# --- Load data --------------------------------------------------------------
 df_raw = load_esus_page()
-_sintoma_src = df_raw.attrs.get("sintoma_source", "data de notificação")
-if "municipionotificacao" in df_raw.columns:
-    df_all = df_raw[df_raw["municipionotificacao"] == "Recife"].copy()
-else:
-    df_all = df_raw.copy()
+df_all = df_raw.copy()
 
 # --- Detect optional columns (present only in a richer source) --------------
 _cols = {c.lower(): c for c in df_all.columns}
