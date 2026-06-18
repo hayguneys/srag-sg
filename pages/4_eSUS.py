@@ -162,8 +162,6 @@ with tab1:
         ("Testes positivos", fmt_int(total_pos), delta_pos, _cmp_se),
         ("Positividade", f"{pct_pos:.1f}%"),
     ])
-    st.caption(f"Data analítica: {_sintoma_src}.")
-
     st.markdown("---")
 
     # ---- Perfil dos casos (sexo / faixa etária / bairro) -------------------
