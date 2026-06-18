@@ -196,28 +196,50 @@ def load_sg() -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner="Carregando eSUS-Notifica…")
-def load_esus() -> pd.DataFrame:
+def _load_esus_base() -> pd.DataFrame:
+    """Single cached loader for eSUS_all.parquet; converts strings to category."""
     path = DATA_DIR / "eSUS_all.parquet"
     if not path.exists():
         st.error(f"Arquivo não encontrado: {path}")
         st.stop()
-    df = pd.read_parquet(path, columns=["datanotificacao", "tipoteste", "resultadofinal", "municipionotificacao"])
-    df["datanotificacao"] = pd.to_datetime(df["datanotificacao"], errors="coerce")
-    # Normalise em-dash vs hyphen in test type names
-    df["tipoteste"] = df["tipoteste"].str.replace("–", "-", regex=False)
+    df = pd.read_parquet(path)
+    if "datanotificacao" in df.columns:
+        df["datanotificacao"] = pd.to_datetime(df["datanotificacao"], errors="coerce")
+    if "tipoteste" in df.columns:
+        df["tipoteste"] = df["tipoteste"].str.replace("–", "-", regex=False)
+    for col in df.select_dtypes(include=["object", "string"]).columns:
+        df[col] = df[col].astype("category")
     return df
+
+
+def load_esus() -> pd.DataFrame:
+    df = _load_esus_base()
+    want = ["datanotificacao", "tipoteste", "resultadofinal", "municipionotificacao"]
+    return df[[c for c in want if c in df.columns]].copy()
+
+
+_SRAG_COLS = [
+    "AN_ADENO", "AN_OUTRO", "AN_PARA1", "AN_PARA2", "AN_PARA3", "AN_SARS2", "AN_VSR",
+    "CLASSI_FIN", "CO_UNI_NOT", "CS_RACA", "CS_SEXO",
+    "DT_DIGITA", "DT_EVOLUCA", "DT_SIN_PRI",
+    "EVOLUCAO", "ID_MN_RESI", "ID_UNIDADE",
+    "NM_BAIRRO", "NM_UN_INTE", "NU_IDADE_N",
+    "PCR_ADENO", "PCR_BOCA", "PCR_METAP", "PCR_PARA1", "PCR_PARA2", "PCR_PARA3",
+    "PCR_PARA4", "PCR_RINO", "PCR_SARS2", "PCR_VSR",
+    "POS_PCRFLU", "POS_PCROUT", "UTI",
+]
 
 
 @st.cache_data(show_spinner="Carregando SRAG…")
 def load_srag_withna() -> pd.DataFrame:
-    # SIVEP-GRIPE SRAG, município de residência = Recife, série histórica.
-    # Analytic date is DT_SIN_PRI (data dos primeiros sintomas). See
-    # data/build_srag_sintomas.py for how this parquet is produced.
     path = DATA_DIR / "srag_sintomas.parquet"
     if not path.exists():
         st.error(f"Arquivo não encontrado: {path}")
         st.stop()
-    df = pd.read_parquet(path)
+    import pyarrow.parquet as pq
+    available = set(pq.read_schema(path).names)
+    want = [c for c in _SRAG_COLS if c in available]
+    df = pd.read_parquet(path, columns=want)
     for c in ("DT_DIGITA", "DT_SIN_PRI"):
         if c in df.columns:
             df[c] = pd.to_datetime(df[c], errors="coerce")
@@ -946,21 +968,11 @@ def load_sg_srag_linked() -> pd.DataFrame:
 
 
 # --- eSUS extended loader (for Resumo Executivo KPI cards) ---------------
-@st.cache_data(show_spinner="Carregando eSUS — KPIs…")
 def load_esus_kpi() -> pd.DataFrame:
     """Load eSUS with state column for Brazil / PE / Recife KPI computation."""
-    path = DATA_DIR / "eSUS_all.parquet"
-    if not path.exists():
-        st.error(f"Arquivo não encontrado: {path}")
-        st.stop()
+    df = _load_esus_base()
     want = ["datanotificacao", "resultadofinal", "municipionotificacao", "estadonotificacao", "municipio"]
-    try:
-        df = pd.read_parquet(path, columns=want)
-    except Exception:
-        df = pd.read_parquet(path)
-        df = df[[c for c in want if c in df.columns]]
-    df["datanotificacao"] = pd.to_datetime(df["datanotificacao"], errors="coerce")
-    return df
+    return df[[c for c in want if c in df.columns]].copy()
 
 
 # --- eSUS full loader (for the e-SUS / COVID page) -----------------------
@@ -973,28 +985,22 @@ _ESUS_SINTOMA_CANDS = (
 )
 
 
-@st.cache_data(show_spinner="Carregando e-SUS Notifica…")
 def load_esus_page() -> pd.DataFrame:
     """Load the full eSUS-Notifica extract for the e-SUS page.
 
-    Reads every column so the page lights up automatically when a richer source
+    Returns every column so the page lights up automatically when a richer source
     (with symptom-onset date, idade, sexo, …) is dropped in. The analytic date
     ``DT_SINTOMAS`` is the data dos primeiros sintomas, filled from the
-    notification date where empty ("primeiros sintomas = notificação quando
-    vazio"); if the source has no symptom column it equals the notification date.
+    notification date where empty.
     """
-    path = DATA_DIR / "eSUS_all.parquet"
-    if not path.exists():
-        st.error(f"Arquivo não encontrado: {path}")
-        st.stop()
-    df = pd.read_parquet(path)
+    df = _load_esus_base().copy()
 
     lower = {c.lower(): c for c in df.columns}
     notif_col = lower.get("datanotificacao") or lower.get("data_notificacao")
     sin_col = next((lower[c] for c in _ESUS_SINTOMA_CANDS if c in lower), None)
 
     notif = (
-        pd.to_datetime(df[notif_col], errors="coerce") if notif_col
+        df[notif_col] if notif_col
         else pd.Series(pd.NaT, index=df.index)
     )
     df["DT_NOTIFIC"] = notif
@@ -1005,8 +1011,6 @@ def load_esus_page() -> pd.DataFrame:
         df["DT_SINTOMAS"] = notif
         df.attrs["sintoma_source"] = "data de notificação (sem coluna de sintomas)"
 
-    if "tipoteste" in df.columns:
-        df["tipoteste"] = df["tipoteste"].astype(str).str.replace("–", "-", regex=False)
     return df
 
 
