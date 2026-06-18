@@ -154,7 +154,7 @@ st.markdown("---")
 st.markdown("## Nowcasting + Forecasting")
 st.markdown("#### SRAG — Síndrome Respiratória Aguda Grave")
 embed_html_plot("nowcasting_srag.html", height=520, fix_legend=True)
-st.caption("Fonte: BRASIL. Ministério da Saúde. SIVEP-GRIPE. Banco de Dados de Síndromes Respiratórias Agudas Graves. Brasília, 2026.")
+st.caption("Fonte: SESAU/SEVS/GGAM/GEVEPI/DDT/SIVEP-GRIPE")
 
 st.markdown("---")
 
