@@ -4,28 +4,6 @@ Dashboard interativo feito pela equipe de dados do CIE para **Síndrome Gripal (
 **Síndrome Respiratória Aguda Grave (SRAG)**, com
 nowcasting e forecasting usando o modelo `nowcaster` INLA .
 
-## estrutura
-
-```
-.
-├── app.py                  # landing page + navigation
-├── pages/
-│   ├── 1_SG.py             # SG page
-│   ├── 2_SRAG.py           # SRAG page
-│   ├── 4_eSUS.py           # e-SUS Notifica (COVID-19) page
-│   └── 3_Resumo_Executivo.py
-├── utils/
-│   └── helpers.py          # data loading, filters, KPI/seasonality helpers
-├── data/
-│   ├── sg_main.parquet         # SG cases — série histórica desde 2013
-│   ├── srag_sintomas.parquet   # SRAG cases — série histórica desde 2019
-│   └── eSUS_all.parquet        # eSUS-Notifica (COVID-19)
-├── plots/
-│   ├── nowcasting_sg.html  # pre-rendered interactive plotly
-│   └── nowcasting_srag.html
-├── requirements.txt
-└── .streamlit/config.toml
-```
 
 ## Filtros e séries históricas
 
@@ -45,7 +23,7 @@ nowcasting e forecasting usando o modelo `nowcaster` INLA .
     (VACINA_COV) · vacinação influenza (VACINA) · tratamento antiviral
     COVID (TRAT_COV)
   - Dois gráficos de barras empilhadas (CLASSI_FIN por semana
-    epidemiológica): **faixa 0–9 anos** e **faixa 60+ anos**
+    epidemiológica): 
 - **Tab 2 — Nowcasting + Forecasting** — gráfico plotly interativo
 
 ### SRAG
