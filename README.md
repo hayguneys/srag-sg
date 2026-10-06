@@ -1,4 +1,4 @@
-# SG / SRAG Surveillance Dashboard
+# Painel de Monitoramento de SG / SRAG / Covid-19
 
 Dashboard interativo feito pela equipe de dados do CIE para **Síndrome Gripal (SG)** e
 **Síndrome Respiratória Aguda Grave (SRAG)**, com
